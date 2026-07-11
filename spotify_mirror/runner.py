@@ -208,7 +208,7 @@ def run_pass(opts):
         try:
             from . import downloads
 
-            downloads.run(sp, selected, opts.download_dir)
+            downloads.run(sp, selected, opts.download_dir, opts.song_cache_file)
         except Exception as e:
             log_warn(f"local download mirror failed (playlist sync unaffected): {e!r}", tag="local")
 

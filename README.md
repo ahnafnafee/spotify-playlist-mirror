@@ -1,6 +1,6 @@
 # 🎵 Spotify Playlist Mirror
 
-[![CI](https://github.com/ahnafnafee/spotify-playlist-mirror/actions/workflows/ci.yml/badge.svg)](https://github.com/ahnafnafee/spotify-playlist-mirror/actions/workflows/ci.yml)
+[![CI](https://github.com/ahnafnafee/spotify-playlist-mirror-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/ahnafnafee/spotify-playlist-mirror-sync/actions/workflows/ci.yml)
 ![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Docker ready](https://img.shields.io/badge/docker-ready-2496ED)
@@ -283,6 +283,14 @@ the Spotify playlist are deleted locally, and an interrupted run just continues
 next pass (only the file in flight when it stopped is re-fetched). The Spotify
 playlist cover is saved at the highest resolution Spotify offers and refreshed
 only when it changes.
+
+**Unchanged playlists are skipped outright.** spotDL spends minutes
+pre-processing before it reports a single skip (it re-fetches the whole
+playlist and re-matches every track), and it does that even when nothing
+changed. So a playlist whose Spotify `snapshot_id` is unchanged since its last
+successful download is skipped entirely — no spotDL invocation at all. Only the
+first download of a playlist, or one that actually changed, pays that cost.
+(Use `--refresh-local` to force-rebuild the m3u/tags/covers without downloading.)
 
 **Metadata for Jellyfin.** spotDL embeds full Spotify tags + cover art on
 download. On top of that, finalize **backfills any missing** tags

@@ -23,7 +23,7 @@ from pathlib import Path
 
 import requests
 
-from . import spotify
+from . import archive, spotify
 from .logs import fmt_secs, log_download, log_miss, log_note, log_section, log_summary, log_warn
 from .matching import normalize_text as _norm
 
@@ -458,6 +458,7 @@ def _sync_one(sp, playlist, folder, timeout_s):
     extra = f", {tagged} tagged" if tagged else ""
     log_summary(f"{name}: {downloaded} downloaded, {skipped} already had, {stamped} date-stamped{extra}, m3u {order}"
                 f"  (in {fmt_secs(time.monotonic() - started)})", tag="local")
+    return code == 0  # clean = spotDL finished (not timed out / errored)
 
 
 def _folder_for(base, playlist, used):
@@ -502,8 +503,12 @@ def refresh(sp, spotify_playlists, download_dir):
         log_warn(f"refresh failed: {e!r}", tag="local")
 
 
-def run(sp, spotify_playlists, download_dir):
-    """Never raises out; logs one skip line if spotdl/ffmpeg aren't set up."""
+def run(sp, spotify_playlists, download_dir, song_cache_file=None):
+    """Never raises out; logs one skip line if spotdl/ffmpeg aren't set up.
+    A playlist whose Spotify snapshot is unchanged since its last successful
+    download is skipped entirely — spotDL's minutes-long pre-processing (it
+    re-fetches the playlist and re-matches every track before reporting a
+    single skip) is pure waste when nothing changed."""
     try:
         if importlib.util.find_spec("spotdl") is None:
             log_note("local mirror skipped: spotdl not installed (uv sync --extra download)", tag="local")
@@ -517,12 +522,27 @@ def run(sp, spotify_playlists, download_dir):
         timeout_s = int(os.getenv("LOCAL_MIRROR_TIMEOUT", DEFAULT_TIMEOUT_S))
         log_section("Local downloads", f"{len(spotify_playlists)} playlist(s) -> {download_dir}", tag="local")
 
+        songs = archive.connect(song_cache_file) if song_cache_file else None
         used = set()
-        for playlist in spotify_playlists:
-            name = playlist.get("name") or playlist.get("id", "playlist")
-            try:
-                _sync_one(sp, playlist, _folder_for(base, playlist, used), timeout_s)
-            except Exception as e:
-                log_warn(f"'{name}': {e!r}", tag="local")
+        try:
+            for playlist in spotify_playlists:
+                name = playlist.get("name") or playlist.get("id", "playlist")
+                folder = _folder_for(base, playlist, used)
+                snapshot = playlist.get("snapshot_id")
+                key = (playlist.get("name") or "").strip().casefold()
+                if songs is not None and snapshot and key:
+                    state = archive.get_state(songs, key, "local")
+                    if state and state[0] == snapshot and folder.exists():
+                        log_note(f"'{name}': unchanged since last download - skipped", tag="local")
+                        continue
+                try:
+                    clean = _sync_one(sp, playlist, folder, timeout_s)
+                    if clean and songs is not None and snapshot and key:
+                        archive.set_state(songs, key, "local", snapshot, 0)
+                except Exception as e:
+                    log_warn(f"'{name}': {e!r}", tag="local")
+        finally:
+            if songs is not None:
+                songs.close()
     except Exception as e:
         log_warn(f"local mirror failed: {e!r}", tag="local")
