@@ -14,10 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v8
-        # NOTE: uv cache intentionally NOT enabled — the bundled cache saves in a
-        # post-step that runs even on failed runs and can poison main. Deps here
-        # are small, so a clean install each run is cheaper than the risk.
+      # setup-uv publishes no moving major tag for v8 (only exact v8.x.y), so
+      # this is pinned to the exact latest; bump it when a newer release lands.
+      # uv cache intentionally NOT enabled — the bundled cache saves in a
+      # post-step that runs even on failed runs and can poison main; deps here
+      # are small, so a clean install each run is cheaper than the risk.
+      - uses: astral-sh/setup-uv@v8.3.2
 
       # Core deps only — the tests import spotDL / mutagen lazily and mock them,
       # so the `download` extra isn't needed to run them.
