@@ -11,6 +11,7 @@ file's mtime to its Spotify added-at date so Date-Modified sort = date-added.
 
 import importlib.util
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -203,6 +204,20 @@ def build_sync_cmd(folder, save_file, playlist_url):
     return cmd
 
 
+def _kill_tree(proc):
+    """Kill spotDL and its yt-dlp children. On Windows proc.kill() alone orphans
+    the grandchildren, so use taskkill /T to take down the whole tree."""
+    if proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, check=False)
+        else:
+            proc.kill()
+    except Exception:
+        pass
+
+
 def _stream_spotdl(cmd, folder, timeout_s):
     """Run spotDL, streaming meaningful lines live. Returns (downloaded, skipped,
     return_code). A watchdog kills a hung run after timeout_s; because the read
@@ -216,7 +231,22 @@ def _stream_spotdl(cmd, folder, timeout_s):
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, encoding="utf-8", errors="replace", bufsize=1, cwd=str(folder), env=env)
-    killer = threading.Timer(timeout_s, proc.kill)
+
+    # Read spotDL's output on a side thread into a queue so the MAIN loop polls
+    # with a timeout and stays interruptible — a blocking readline on the main
+    # thread can't be broken by Ctrl+C on Windows, which is why it "wouldn't stop".
+    lines = queue.Queue()
+
+    def reader():
+        try:
+            for raw in proc.stdout:
+                lines.put(raw)
+        finally:
+            lines.put(None)  # EOF sentinel
+
+    threading.Thread(target=reader, daemon=True).start()
+
+    killer = threading.Timer(timeout_s, lambda: _kill_tree(proc))
     killer.start()
 
     # Heartbeat: spotDL can go silent for a while (searching, or downloading one
@@ -229,10 +259,15 @@ def _stream_spotdl(cmd, folder, timeout_s):
             log_note(f"...still working: {counts['downloaded']} downloaded, {counts['skipped']} skipped"
                      f" ({fmt_secs(time.monotonic() - start)} elapsed)", tag="local")
 
-    ticker = threading.Thread(target=heartbeat, daemon=True)
-    ticker.start()
+    threading.Thread(target=heartbeat, daemon=True).start()
     try:
-        for raw in proc.stdout:
+        while True:
+            try:
+                raw = lines.get(timeout=1)  # returns to Python every 1s, so Ctrl+C lands here
+            except queue.Empty:
+                continue
+            if raw is None:
+                break
             line = raw.strip()
             if not line:
                 continue
@@ -251,11 +286,13 @@ def _stream_spotdl(cmd, folder, timeout_s):
             elif "rror" in line or "Exception" in line:  # Error / *Error
                 log_warn(line[:200], tag="local")
         proc.wait()
+    except KeyboardInterrupt:
+        _kill_tree(proc)  # stop spotDL + yt-dlp immediately, then propagate
+        raise
     finally:
         stop.set()
         killer.cancel()
-        if proc.poll() is None:  # interrupted/timed out — don't orphan the child
-            proc.kill()
+        _kill_tree(proc)
     return counts["downloaded"], counts["skipped"], proc.returncode
 
 
