@@ -16,6 +16,7 @@ wheels/
 .cache-*
 apple_resolve_cache.json
 song_cache.db
+spotify_tracks_cache.json
 ytmusic_browser.json
 ytmusic_resolve_cache.json
 data/

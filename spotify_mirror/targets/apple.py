@@ -39,24 +39,30 @@ class AppleMusicTarget(MirrorTarget):
     def __init__(self, storefront, cache_file):
         self.storefront = storefront
         self.cache_file = cache_file
-        self.headers = _headers()  # read env now so re-captured tokens are picked up per pass
+        # One pooled session (keep-alive) for the whole pass — opening a fresh
+        # TCP/TLS connection per request is what triggers Apple's connection
+        # resets under the ~100+ calls a big playlist needs. Headers read env
+        # now so re-captured tokens are picked up per pass.
+        self._session = requests.Session()
+        self._session.headers.update(_headers())
 
     # -- HTTP ------------------------------------------------------------------
     def _request(self, method, url, *, params=None, json_body=None, ok404=False):
-        """One amp-api call. GETs retry on 5xx/network; 429s back off and retry
-        on every method (a rate-limited call never executed); other mutation
-        failures are single-shot — a lost add/remove self-heals next pass, a
-        blindly retried one could double-apply."""
-        attempts = 4
+        """One amp-api call over the pooled session. GETs retry with exponential
+        backoff on network resets / 5xx; 429s back off on every method (a
+        rate-limited call never executed); other mutation failures are
+        single-shot — a lost add/remove self-heals next pass, a blindly retried
+        one could double-apply."""
+        attempts = 5
         for attempt in range(attempts):
             try:
-                r = requests.request(method, url, headers=self.headers, params=params,
-                                     json=json_body, timeout=REQUEST_TIMEOUT)
+                r = self._session.request(method, url, params=params, json=json_body, timeout=REQUEST_TIMEOUT)
             except requests.RequestException:
-                if method != "GET" or attempt >= 2:
-                    raise
-                time.sleep(2 * (attempt + 1))
-                continue
+                # Connection reset / blip: retry GETs (idempotent) with backoff.
+                if method == "GET" and attempt < attempts - 1:
+                    time.sleep(min(2 ** attempt, 20) + random.uniform(0, 2))
+                    continue
+                raise
             if r.status_code in (401, 403):
                 raise TargetAuthError(
                     f"Apple rejected {method} {url.split('/v1/')[-1]} ({r.status_code}). "
@@ -69,8 +75,8 @@ class AppleMusicTarget(MirrorTarget):
                 log(f"  rate-limited by Apple; waiting {int(wait)}s", tag=self.tag)
                 time.sleep(wait)
                 continue
-            if r.status_code >= 500 and method == "GET" and attempt < 2:
-                time.sleep(2 * (attempt + 1))
+            if r.status_code >= 500 and method == "GET" and attempt < attempts - 1:
+                time.sleep(min(2 ** attempt, 20) + random.uniform(0, 2))
                 continue
             r.raise_for_status()
             return r

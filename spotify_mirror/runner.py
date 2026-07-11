@@ -6,6 +6,7 @@ internally sequential to preserve append order and avoid robotic bursts.
 """
 
 import json
+import os
 import threading
 import time
 
@@ -14,6 +15,19 @@ from dotenv import load_dotenv
 from . import archive, spotify
 from .logs import fmt_counts, fmt_secs, log, log_note, log_section, log_summary, log_warn, paint
 from .targets import TargetAuthError, build_targets, mirror_pair
+
+
+def _load_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f)
 
 
 def load_cache(cache_file):
@@ -123,13 +137,31 @@ def run_pass(opts):
 
     songs = archive.connect(opts.song_cache_file)
     sp_memo, sp_lock = {}, threading.Lock()
+    # Disk cache of playlist tracks keyed by Spotify's snapshot_id: while a
+    # playlist is unchanged its 7-page fetch is served from disk, so passes
+    # don't re-hammer Spotify. snapshot_id changes exactly when the playlist
+    # does, so there's no staleness (unlike a time-based TTL).
+    sp_snap = {p["id"]: p.get("snapshot_id") for p in selected}
+    tracks_cache_file = os.getenv("SPOTIFY_TRACKS_CACHE", "spotify_tracks_cache.json")
+    tracks_cache = _load_json(tracks_cache_file)
+    tracks_state = {"dirty": False}
 
     def get_sp_tracks(playlist_id):
-        # Lock guards the memo AND serialises the shared spotipy client.
+        # Lock guards the memo/cache AND serialises the shared spotipy client.
         with sp_lock:
-            if playlist_id not in sp_memo:
-                sp_memo[playlist_id] = spotify.playlist_tracks(sp, playlist_id)
-            return sp_memo[playlist_id]
+            if playlist_id in sp_memo:
+                return sp_memo[playlist_id]
+            snap = sp_snap.get(playlist_id)
+            entry = tracks_cache.get(playlist_id)
+            if entry and snap and entry.get("snapshot") == snap:
+                sp_memo[playlist_id] = entry["tracks"]  # unchanged since last pass
+                return entry["tracks"]
+            tracks = spotify.playlist_tracks(sp, playlist_id)
+            sp_memo[playlist_id] = tracks
+            if snap:
+                tracks_cache[playlist_id] = {"snapshot": snap, "tracks": tracks}
+                tracks_state["dirty"] = True
+            return tracks
 
     results, errors = {}, []
 
@@ -151,6 +183,8 @@ def run_pass(opts):
                 t.join(0.5)
     finally:
         songs.close()
+        if tracks_state["dirty"]:
+            _save_json(tracks_cache_file, tracks_cache)
 
     log_section("Pass complete", fmt_secs(time.monotonic() - started))
     for target in targets:

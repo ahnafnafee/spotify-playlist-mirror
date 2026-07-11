@@ -313,6 +313,13 @@ Everything resolvable is cached so steady-state passes are near-instant:
 
 - `apple_resolve_cache.json` / `ytmusic_resolve_cache.json` — ISRC and search
   resolutions, including misses (delete a file to force fresh matching).
+- `spotify_tracks_cache.json` — each playlist's full track list keyed by
+  Spotify's `snapshot_id`, so an unchanged playlist isn't re-paginated every
+  pass. `snapshot_id` changes exactly when the playlist does, so there's no
+  staleness (unlike a time-based cache).
+- Apple requests reuse one pooled keep-alive connection per pass and back off
+  on resets/429s — the fix for `ConnectionReset` under a big playlist's many
+  calls.
 - `song_cache.db → links` — Spotify id → Apple catalog id / YT videoId for
   every successful match. Hard identifiers beat title matching on later passes;
   delete a row if a linked id ever goes stale.
