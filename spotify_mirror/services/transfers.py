@@ -54,6 +54,21 @@ def transfer(source, dest, src_pl, dest_pl, cache, *, execute, max_adds):
     return {"added": len(additions), "deferred": deferred, "not_found": not_found}
 
 
+def _friendly_error(e):
+    """Turn a raw provider exception into a message a user can act on. Falls back
+    to repr() for anything unrecognized."""
+    status = getattr(e, "http_status", None)
+    if status == 403:
+        return ("The source service blocked reading this playlist (HTTP 403) — it's most "
+                "likely owned by another account, or an editorial/auto-generated playlist the "
+                "API can't read. Try a playlist you created.")
+    if status == 429:
+        return "The provider is rate-limiting (HTTP 429). Wait a moment and try again."
+    if status == 404:
+        return "That playlist no longer exists on the source (HTTP 404)."
+    return repr(e)
+
+
 class TransferService:
     """One-off cross-service copies, serialized with syncs via SyncService. Jobs
     are in-memory and transient."""
@@ -133,8 +148,8 @@ class TransferService:
             self._emit("summary", f"transfer done: +{res['added']} ({len(res['not_found'])} unmatched)",
                        "transfer", {"job_id": job["id"]})
         except Exception as e:
-            job["status"], job["error"] = "error", repr(e)
-            self._emit("warn", f"transfer failed: {e!r}", "transfer")
+            job["status"], job["error"] = "error", _friendly_error(e)
+            self._emit("warn", f"transfer failed: {job['error']}", "transfer")
 
     def _build(self, provider_id, opts):
         sp = None
