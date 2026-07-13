@@ -8,7 +8,7 @@ import time
 import requests
 
 from ..config import AMP, REQUEST_TIMEOUT, polite_sleep, required_env
-from ..logs import log
+from ..logs import log, log_warn
 from ..matching import normalize_text, romanized, score_candidate
 from .base import MirrorTarget, TargetAuthError
 
@@ -45,6 +45,7 @@ class AppleMusicTarget(MirrorTarget):
         # now so re-captured tokens are picked up per pass.
         self._session = requests.Session()
         self._session.headers.update(_headers())
+        self._search_throttled = False  # set once catalog search rate-limits; defer the rest of the pass
 
     # -- HTTP ------------------------------------------------------------------
     def _request(self, method, url, *, params=None, json_body=None, ok404=False):
@@ -70,8 +71,10 @@ class AppleMusicTarget(MirrorTarget):
                 )
             if r.status_code == 404 and ok404:
                 return None
-            if r.status_code == 429 and attempt < attempts - 1:
-                wait = float(r.headers.get("Retry-After") or 20) + random.uniform(1, 8)
+            if r.status_code == 429 and attempt < 1:
+                # One short retry for a transient blip; a sustained catalog-search
+                # limit is handled by the resolver deferring the rest of the pass.
+                wait = float(r.headers.get("Retry-After") or 10) + random.uniform(1, 4)
                 log(f"  rate-limited by Apple; waiting {int(wait)}s", tag=self.tag)
                 time.sleep(wait)
                 continue
@@ -211,12 +214,22 @@ class AppleMusicTarget(MirrorTarget):
         key = f"{name}|{primary}".casefold()
         if key in cache["search"]:
             return cache["search"][key]
-        best = self._search_once(f"{name} {primary}".strip(), name, artists, duration_ms)
-        if not best:
-            rom = f"{romanized(name)} {romanized(primary)}".strip()
-            if rom and rom != normalize_text(f"{name} {primary}"):
-                polite_sleep(0.3)
-                best = self._search_once(rom, name, artists, duration_ms)
+        if self._search_throttled:
+            return None  # catalog search rate-limited earlier this pass; defer to the next (don't cache a miss)
+        try:
+            best = self._search_once(f"{name} {primary}".strip(), name, artists, duration_ms)
+            if not best:
+                rom = f"{romanized(name)} {romanized(primary)}".strip()
+                if rom and rom != normalize_text(f"{name} {primary}"):
+                    polite_sleep(0.3)
+                    best = self._search_once(rom, name, artists, duration_ms)
+        except requests.HTTPError as e:
+            if "429" not in str(e):
+                raise
+            self._search_throttled = True
+            log_warn("Apple Music search rate-limited — deferring the rest of the resolves to the next pass",
+                     tag=self.tag)
+            return None
         cache["search"][key] = best
         cache["dirty"] = True
         polite_sleep(0.3)
