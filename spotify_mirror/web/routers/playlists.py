@@ -4,7 +4,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Body, Request
 
-from ...playlists import PlaylistLink, PlaylistService
+from ...services.playlists import PlaylistLink, PlaylistService
 
 router = APIRouter()
 

@@ -5,10 +5,10 @@ import time
 
 from dotenv import load_dotenv
 
-from .config import parse_args
-from .logs import fmt_secs, log_note, log_warn
-from .runner import run_pass
-from .targets import TargetAuthError
+from .engine.config import parse_args
+from .engine.logs import fmt_secs, log_note, log_warn
+from .engine.runner import run_pass
+from .engine.targets import TargetAuthError
 
 
 def main(argv=None):

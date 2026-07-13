@@ -1,7 +1,7 @@
 """run_pass returns a per-pass summary dict (consumed by the web layer)."""
 
-import spotify_mirror.runner as runner
-from spotify_mirror.config import Options
+import spotify_mirror.engine.runner as runner
+from spotify_mirror.engine.config import Options
 
 
 def _opts(**kw):
@@ -45,8 +45,8 @@ def test_nway_wraps_accumulated_summary(monkeypatch):
 
 
 def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
-    from spotify_mirror import archive
-    from spotify_mirror.playlists import PlaylistLink
+    from spotify_mirror.engine import archive
+    from spotify_mirror.services.playlists import PlaylistLink
 
     songs = archive.connect(str(tmp_path / "s.db"))
 

@@ -14,11 +14,11 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from ..events import EventBus
-from ..playlists import LinkStore
-from ..settings import SettingsStore
-from ..sync_service import SyncService
-from ..transfers import TransferService
+from ..services.events import EventBus
+from ..services.playlists import LinkStore
+from ..services.settings import SettingsStore
+from ..services.sync_service import SyncService
+from ..services.transfers import TransferService
 from .routers import accounts, events, playlists, settings as settings_router, sync, transfers as transfers_router
 
 # Built React SPA (Vite output), served in production; in dev the vite server

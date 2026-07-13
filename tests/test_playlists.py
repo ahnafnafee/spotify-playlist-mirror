@@ -1,7 +1,7 @@
 """build_one registry helper + PlaylistService."""
 
-from spotify_mirror import targets
-from spotify_mirror.config import parse_args
+from spotify_mirror.engine import targets
+from spotify_mirror.engine.config import parse_args
 
 
 def test_build_one_unknown_returns_none():
@@ -15,8 +15,8 @@ def test_build_one_known_dispatches(monkeypatch):
 
 
 def test_browse_normalizes_rows(monkeypatch, tmp_path):
-    from spotify_mirror.playlists import PlaylistService
-    from spotify_mirror.settings import SettingsStore
+    from spotify_mirror.services.playlists import PlaylistService
+    from spotify_mirror.services.settings import SettingsStore
 
     class FakeTarget:
         def list_playlists(self):
@@ -25,13 +25,13 @@ def test_browse_normalizes_rows(monkeypatch, tmp_path):
         def playlist_count(self, pl):
             return (pl.get("tracks") or {}).get("total")
 
-    monkeypatch.setattr("spotify_mirror.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
+    monkeypatch.setattr("spotify_mirror.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("apple")
     assert rows == [{"id": "1", "name": "Chill", "count": 5}]
 
 
 def test_linkstore_roundtrip(tmp_path):
-    from spotify_mirror.playlists import LinkStore, PlaylistLink
+    from spotify_mirror.services.playlists import LinkStore, PlaylistLink
 
     store = LinkStore(dir=tmp_path)
     link = store.upsert(PlaylistLink(name="My Pair", members={"spotify": "s1", "apple": None}))

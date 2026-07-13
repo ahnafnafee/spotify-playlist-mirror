@@ -10,13 +10,13 @@ import asyncio
 import time
 import uuid
 
-from . import logs, spotify
-from .config import parse_args
-from .logs import log_add, log_miss
-from .matching import spotify_track_keys, track_key
-from .runner import load_cache, save_cache
-from .targets import build_one
-from .targets.base import TargetAuthError, _normalize
+from ..engine import logs, spotify
+from ..engine.config import parse_args
+from ..engine.logs import log_add, log_miss
+from ..engine.matching import spotify_track_keys, track_key
+from ..engine.runner import load_cache, save_cache
+from ..engine.targets import build_one
+from ..engine.targets.base import TargetAuthError, _normalize
 
 
 def transfer(source, dest, src_pl, dest_pl, cache, *, execute, max_adds):

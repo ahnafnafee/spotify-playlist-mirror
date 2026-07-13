@@ -2,10 +2,10 @@
 
 import asyncio
 
-from spotify_mirror.events import EventBus
-from spotify_mirror.settings import SettingsStore
-from spotify_mirror.sync_service import SyncService
-from spotify_mirror.transfers import TransferService, transfer
+from spotify_mirror.services.events import EventBus
+from spotify_mirror.services.settings import SettingsStore
+from spotify_mirror.services.sync_service import SyncService
+from spotify_mirror.services.transfers import TransferService, transfer
 
 
 class _Src:
@@ -56,7 +56,7 @@ def test_run_exclusive_queues_behind_sync(monkeypatch, tmp_path):
     order = []
 
     async def scenario():
-        import spotify_mirror.sync_service as m
+        import spotify_mirror.services.sync_service as m
 
         async def fake_pass(opts):
             order.append("sync-start")
@@ -144,7 +144,7 @@ def test_transfer_service_reports_conflicts(monkeypatch, tmp_path):
 
 
 def test_transfer_service_resolve_writes_cache(monkeypatch, tmp_path):
-    from spotify_mirror.runner import load_cache
+    from spotify_mirror.engine.runner import load_cache
 
     out = {}
 

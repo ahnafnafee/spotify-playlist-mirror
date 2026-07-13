@@ -6,7 +6,7 @@ import stat
 import pytest
 from dotenv import load_dotenv
 
-from spotify_mirror.settings import SettingsStore
+from spotify_mirror.services.settings import SettingsStore
 
 
 def test_saved_credential_survives_dotenv_reload(tmp_path, monkeypatch):

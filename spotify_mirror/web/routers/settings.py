@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Body, Request
 
-from ...accounts import CONNECTORS
+from ...services.accounts import CONNECTORS
 
 router = APIRouter()
 

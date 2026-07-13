@@ -10,10 +10,10 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import spotify
-from .config import parse_args
+from ..engine import spotify
+from ..engine.config import parse_args
+from ..engine.targets import build_one
 from .settings import _open_private
-from .targets import build_one
 
 
 # ponytail: provider playlist dicts store name/id differently (Spotify `name`,

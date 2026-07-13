@@ -71,7 +71,7 @@ def _summary(opts, per_target, started, *, ok=True, error=None):
 def _load_links():
     """Enabled explicit pairings (empty when none configured, so behavior is
     unchanged). Late import keeps the engine's module graph free of the web tier."""
-    from .playlists import LinkStore
+    from ..services.playlists import LinkStore
 
     return [link for link in LinkStore().list() if link.enabled]
 

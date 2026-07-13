@@ -10,9 +10,9 @@ events reach the live view through the EventBus.
 import asyncio
 import time
 
-from . import logs
-from .config import DEFAULT_INTERVAL, parse_args, parse_interval
-from .runner import run_pass
+from ..engine import logs
+from ..engine.config import DEFAULT_INTERVAL, parse_args, parse_interval
+from ..engine.runner import run_pass
 
 
 async def _run_pass_async(opts):

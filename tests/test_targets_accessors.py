@@ -1,8 +1,8 @@
 """Provider playlist accessors (name/id) resolve each service's dict shape."""
 
-from spotify_mirror.targets.apple import AppleMusicTarget
-from spotify_mirror.targets.base import MirrorTarget
-from spotify_mirror.targets.ytmusic import YTMusicTarget
+from spotify_mirror.engine.targets.apple import AppleMusicTarget
+from spotify_mirror.engine.targets.base import MirrorTarget
+from spotify_mirror.engine.targets.ytmusic import YTMusicTarget
 
 
 def test_playlist_name_per_provider_shape():

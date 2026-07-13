@@ -2,15 +2,15 @@
 
 import asyncio
 
-from spotify_mirror.events import EventBus
-from spotify_mirror.settings import SettingsStore
+from spotify_mirror.services.events import EventBus
+from spotify_mirror.services.settings import SettingsStore
 
 
 def test_run_now_coalesces(monkeypatch, tmp_path):
     calls = []
 
     async def scenario():
-        import spotify_mirror.sync_service as m
+        import spotify_mirror.services.sync_service as m
 
         async def fake_pass(opts):
             calls.append("start")
@@ -32,7 +32,7 @@ def test_run_now_coalesces(monkeypatch, tmp_path):
 
 def test_run_now_records_failure(monkeypatch, tmp_path):
     async def scenario():
-        import spotify_mirror.sync_service as m
+        import spotify_mirror.services.sync_service as m
 
         async def boom(opts):
             raise RuntimeError("nope")

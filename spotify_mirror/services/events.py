@@ -11,7 +11,7 @@ Services tier: it imports the leaf `logs` module (never the reverse).
 import asyncio
 from collections import deque
 
-from .logs import Event, set_sink
+from ..engine.logs import Event, set_sink
 
 
 class EventBus:

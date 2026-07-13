@@ -1,6 +1,6 @@
 """The optional logs event sink feeds the live view."""
 
-from spotify_mirror import logs
+from spotify_mirror.engine import logs
 
 
 def test_sink_receives_typed_events():

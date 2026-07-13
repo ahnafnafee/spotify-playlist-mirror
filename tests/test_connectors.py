@@ -1,8 +1,8 @@
 """Account connectors: status + the connect entry point per auth kind."""
 
-from spotify_mirror.accounts import CONNECTORS
-from spotify_mirror.accounts.base import DeviceCode
-from spotify_mirror.settings import SettingsStore
+from spotify_mirror.services.accounts import CONNECTORS
+from spotify_mirror.services.accounts.base import DeviceCode
+from spotify_mirror.services.settings import SettingsStore
 
 
 def _conn(cid, tmp_path):

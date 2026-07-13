@@ -5,8 +5,8 @@ from dataclasses import asdict
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import HTMLResponse
 
-from ...accounts import CONNECTORS
-from ...accounts.base import DeviceCode
+from ...services.accounts import CONNECTORS
+from ...services.accounts.base import DeviceCode
 
 router = APIRouter()
 

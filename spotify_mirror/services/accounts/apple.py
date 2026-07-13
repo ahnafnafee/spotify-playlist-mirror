@@ -3,7 +3,7 @@ wizard guides pasting the web player's bearer + Media-User-Token."""
 
 import requests
 
-from ..config import AMP
+from ...engine.config import AMP
 from .base import ConnStatus, Connector, Field
 
 
