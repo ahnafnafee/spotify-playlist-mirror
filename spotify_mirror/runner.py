@@ -46,6 +46,28 @@ def save_cache(cache_file, cache):
         json.dump({"isrc": cache["isrc"], "search": cache["search"]}, f, indent=1)
 
 
+_SUMMARY_KEYS = ("added", "removed", "missing", "held", "deferred", "created", "skipped")
+
+
+def _summary_entry(name, agg):
+    entry = {"name": name}
+    for k in _SUMMARY_KEYS:
+        entry[k] = agg.get(k, 0)
+    return entry
+
+
+def _summary(opts, per_target, started, *, ok=True, error=None):
+    """The value the web layer renders after a pass. The CLI ignores it."""
+    return {
+        "mode": opts.sync_mode,
+        "execute": opts.execute,
+        "duration_s": round(time.monotonic() - started, 1),
+        "ok": ok,
+        "error": error,
+        "per_target": per_target,
+    }
+
+
 def run_target(target, selected, get_sp_tracks, songs, opts):
     """Mirror every selected playlist to one target. Returns an aggregate dict.
     Raises TargetAuthError to abort the whole target (fail closed)."""
@@ -102,6 +124,7 @@ def run_target(target, selected, get_sp_tracks, songs, opts):
 
 
 def run_pass(opts):
+    pass_started = time.monotonic()
     load_dotenv(override=True)  # pick up re-captured tokens without a restart
     # Writable (modify scopes) only for an actual N-way execute — so dry-runs
     # preview without forcing the one-time re-auth a scope change triggers.
@@ -124,25 +147,25 @@ def run_pass(opts):
     if opts.refresh_local:
         if not opts.download_dir:
             log_warn("--refresh-local needs a download dir (set DOWNLOAD_DIR or --download-dir)", indent="  ")
-            return
+            return _summary(opts, [], pass_started)
         from . import downloads
 
         downloads.refresh(sp, selected, opts.download_dir)
-        return
+        return _summary(opts, [], pass_started)
 
     if opts.sync_mode == "nway":
         songs = archive.connect(opts.song_cache_file)
         try:
-            _run_nway(opts, sp, selected, songs)
+            per_target = _run_nway(opts, sp, selected, songs)
         finally:
             songs.close()
         _post_sync(opts, sp, selected)
-        return
+        return _summary(opts, per_target, pass_started)
 
     targets = build_targets(opts)
     if not targets:
         log_warn("no mirror targets configured (set Apple tokens and/or YouTube Music auth)", indent="  ")
-        return
+        return _summary(opts, [], pass_started)
     log(f"  targets: {paint(', '.join(t.name for t in targets), 'cyan')}"
         + (paint(f"   local downloads -> {opts.download_dir}", "grey") if opts.download_dir and opts.execute else ""))
 
@@ -216,6 +239,7 @@ def run_pass(opts):
             raise err  # fatal; main() decides exit vs. loop-continue
 
     _post_sync(opts, sp, selected)
+    return _summary(opts, [_summary_entry(a["name"], a) for a in results.values()], pass_started)
 
 
 def _post_sync(opts, sp, selected):
@@ -242,12 +266,13 @@ def _run_nway(opts, sp, selected, songs):
     peers = build_peers(opts, sp)
     if len(peers) < 2:
         log_warn("N-way sync needs >=2 configured providers (Spotify + Apple and/or YouTube Music)", indent="  ")
-        return
+        return []
     log(f"  peers: {paint(', '.join(p.name for p in peers), 'cyan')}"
         + (paint(f"   local downloads -> {opts.download_dir}", "grey") if opts.download_dir and opts.execute else ""))
 
     dirs = {p.source: p.list_playlists() for p in peers}
     caches = {p.source: load_cache(p.cache_file) for p in peers}
+    total = {"added": 0, "removed": 0, "missing": 0, "held": 0, "deferred": 0}
     try:
         for sp_playlist in selected:
             name = sp_playlist["name"]
@@ -277,8 +302,10 @@ def _run_nway(opts, sp, selected, songs):
                 log_note(f"{name}: fewer than 2 providers have this playlist - skipped", tag="sync")
                 continue
             try:
-                reconcile(active, name, playlists, caches, songs,
-                          execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds)
+                stats = reconcile(active, name, playlists, caches, songs,
+                                  execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds)
+                for k in total:
+                    total[k] += stats.get(k, 0)
             except TargetAuthError:
                 raise
             except Exception as e:
@@ -286,3 +313,4 @@ def _run_nway(opts, sp, selected, songs):
     finally:
         for p in peers:
             save_cache(p.cache_file, caches[p.source])
+    return [_summary_entry("N-way", total)]
