@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { api, errorMessage } from '@/api'
 import { cn } from '@/lib/cn'
-import { serviceLogoId, tagDot, tagSoft, tagText } from '@/lib/constants'
+import { serviceLogoId, tagDot } from '@/lib/constants'
 import type { Account, AuthKind } from '@/types'
 
 import { Button } from '../ui/Button'
@@ -62,10 +62,10 @@ export function AccountCard({ account, onChanged }: { account: Account; onChange
       <div className="flex flex-wrap items-center gap-2.5">
         {logoId ? (
           <span
-            className={cn('grid size-11 shrink-0 place-items-center rounded-card', tagSoft(account.id))}
+            className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-card border border-border bg-surface-2"
             aria-hidden="true"
           >
-            <ServiceLogo service={logoId} className={cn('size-7', tagText(account.id))} />
+            <ServiceLogo service={logoId} className="size-8" />
           </span>
         ) : (
           <span className={cn('size-2.5 shrink-0 rounded-full', tagDot(account.id))} aria-hidden="true" />
