@@ -1,9 +1,9 @@
-name: spotify-playlist-mirror-sync   # compose project (group) name
+name: omni-playlist-sync   # compose project (group) name
 
 services:
   mirror:
     build: .
-    container_name: spotify-mirror
+    container_name: omni-playlist-sync
     env_file: .env
     environment:
       SPOTIFY_TOKEN_CACHE: /data/spotify_token_cache

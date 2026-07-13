@@ -1,6 +1,6 @@
-# 🎵 Spotify Playlist Mirror
+# 🎵 Omni Playlist Sync
 
-[![CI](https://github.com/ahnafnafee/spotify-playlist-mirror-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/ahnafnafee/spotify-playlist-mirror-sync/actions/workflows/ci.yml)
+[![CI](https://github.com/ahnafnafee/omni-playlist-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/ahnafnafee/omni-playlist-sync/actions/workflows/ci.yml)
 ![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Docker ready](https://img.shields.io/badge/docker-ready-2496ED)
@@ -184,8 +184,8 @@ First run opens a browser once for Spotify OAuth; the token is cached (default
 
 ## Always running: Docker
 
-The container runs as **`spotify-mirror`** in the compose group
-**`spotify-playlist-mirror-sync`**, loops `--execute` every `SYNC_INTERVAL`,
+The container runs as **`omni-playlist-sync`** in the compose group
+**`omni-playlist-sync`**, loops `--execute` every `SYNC_INTERVAL`,
 and persists auth + caches in `./data`.
 
 **Seed the Spotify token first** — the container can't open a browser, so it
@@ -221,7 +221,7 @@ Alternative to Docker — one-shot pass every 15 minutes, survives reboots:
 
 ```powershell
 schtasks /Create /TN "SpotifyPlaylistMirror" /SC MINUTE /MO 15 `
-  /TR "cmd /c cd /d D:\GitHub\apple-music-to-spotify-sync && uv run main.py --execute >> sync.log 2>&1"
+  /TR "cmd /c cd /d D:\GitHub\omni-playlist-sync && uv run main.py --execute >> sync.log 2>&1"
 ```
 
 Remove with `schtasks /Delete /TN "SpotifyPlaylistMirror" /F`.

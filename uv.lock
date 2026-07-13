@@ -34,36 +34,6 @@ wheels = [
 ]
 
 [[package]]
-name = "apple-music-to-spotify-sync"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "anyascii" },
-    { name = "python-dotenv" },
-    { name = "rapidfuzz" },
-    { name = "requests" },
-    { name = "spotipy" },
-    { name = "ytmusicapi" },
-]
-
-[package.optional-dependencies]
-download = [
-    { name = "spotdl" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anyascii", specifier = ">=0.3,<1" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "rapidfuzz", specifier = ">=3.9,<4" },
-    { name = "requests", specifier = ">=2.32.5" },
-    { name = "spotdl", marker = "extra == 'download'", specifier = ">=4.5,<5" },
-    { name = "spotipy", specifier = ">=2.26.0" },
-    { name = "ytmusicapi", specifier = ">=1.12,<2" },
-]
-provides-extras = ["download"]
-
-[[package]]
 name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -476,6 +446,36 @@ sdist = { url = "https://files.pythonhosted.org/packages/df/70/1675da133ea92227d
 wheels = [
     { url = "https://files.pythonhosted.org/packages/47/d8/a29e4e3991765e7ce4ed1f7e4074fe1ba9da03e0048639734de60f9cadb9/mutagen-1.48.1-py3-none-any.whl", hash = "sha256:4f077fe87d3fc7fba259aa63d8c026b18382ca6a42ef37c61e16f1b1b5b82fe7", size = 195706, upload-time = "2026-06-25T09:47:30.296Z" },
 ]
+
+[[package]]
+name = "omni-playlist-sync"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "anyascii" },
+    { name = "python-dotenv" },
+    { name = "rapidfuzz" },
+    { name = "requests" },
+    { name = "spotipy" },
+    { name = "ytmusicapi" },
+]
+
+[package.optional-dependencies]
+download = [
+    { name = "spotdl" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyascii", specifier = ">=0.3,<1" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "rapidfuzz", specifier = ">=3.9,<4" },
+    { name = "requests", specifier = ">=2.32.5" },
+    { name = "spotdl", marker = "extra == 'download'", specifier = ">=4.5,<5" },
+    { name = "spotipy", specifier = ">=2.26.0" },
+    { name = "ytmusicapi", specifier = ">=1.12,<2" },
+]
+provides-extras = ["download"]
 
 [[package]]
 name = "pillow"

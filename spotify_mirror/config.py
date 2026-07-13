@@ -62,7 +62,7 @@ class Options:
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(
-        prog="spotify-mirror",
+        prog="omni-playlist-sync",
         description="Mirror Spotify playlists to same-named Apple Music and YouTube Music playlists.",
     )
     p.add_argument("--execute", action="store_true", help="Apply changes to the targets (default: dry run).")
