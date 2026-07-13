@@ -55,7 +55,7 @@ class SpotifyTarget(MirrorTarget):
         return owner is None or owner == self._user()
 
     def playlist_count(self, playlist):
-        return (playlist.get("tracks") or {}).get("total")
+        return spotify.track_total(playlist)
 
     def create(self, sp_playlist):
         pl = self._write(

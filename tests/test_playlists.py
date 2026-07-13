@@ -36,13 +36,12 @@ def test_browse_normalizes_rows(monkeypatch, tmp_path):
 
     monkeypatch.setattr("omni_sync.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("apple")
-    # Non-Spotify providers list only the user's own library, so owned is always True.
-    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": "", "owned": True}]
+    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": ""}]
 
 
-def test_browse_flags_unowned_spotify(monkeypatch, tmp_path):
-    # Spotify also lists followed playlists; those (owner != me) are flagged
-    # owned=False so the UI can mark them non-transferable.
+def test_browse_lists_followed_spotify_playlists(monkeypatch, tmp_path):
+    # Spotify browse lists followed (non-owned) playlists alongside owned ones —
+    # they're transferable via the web-player fallback, so none are filtered out.
     from omni_sync.services.playlists import PlaylistService
     from omni_sync.services.settings import SettingsStore
 
@@ -54,13 +53,21 @@ def test_browse_flags_unowned_spotify(monkeypatch, tmp_path):
         def playlist_count(self, pl):
             return None
 
-        def is_editable(self, pl):
-            return (pl.get("owner") or {}).get("id") == "me"
-
     monkeypatch.setattr("omni_sync.services.playlists.spotify.client", lambda *a, **k: object())
     monkeypatch.setattr("omni_sync.services.playlists.build_one", lambda pid, opts, sp=None: FakeSpotify())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("spotify")
-    assert {r["name"]: r["owned"] for r in rows} == {"Mine": True, "Theirs": False}
+    assert {r["name"] for r in rows} == {"Mine", "Theirs"}
+
+
+def test_track_total_reads_both_shapes():
+    # Spotify's /me/playlists object moved the count from `tracks.total` to
+    # `items.total`; read the current key first, fall back to the legacy one.
+    from omni_sync.engine.spotify import track_total
+
+    assert track_total({"items": {"total": 212}}) == 212
+    assert track_total({"tracks": {"total": 7}}) == 7
+    assert track_total({"items": {"total": 3}, "tracks": {"total": 99}}) == 3
+    assert track_total({}) is None
 
 
 def test_pl_image_extraction():

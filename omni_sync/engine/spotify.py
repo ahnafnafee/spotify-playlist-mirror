@@ -67,6 +67,14 @@ def description(sp_playlist):
     return html.unescape(sp_playlist.get("description") or "").strip()
 
 
+def track_total(playlist):
+    """Track count from a playlist list-object (the /me/playlists shape), or
+    None. The count sits under `items` in the current API response and under
+    `tracks` in the older shape — read the new key first, then the legacy one."""
+    meta = playlist.get("items") or playlist.get("tracks") or {}
+    return meta.get("total")
+
+
 def playlists_by_name(sp):
     """name (casefolded) -> playlist, preferring playlists I own, then bigger."""
     me = _retry(lambda: sp.current_user(), "current_user")["id"]
@@ -81,7 +89,7 @@ def playlists_by_name(sp):
                 continue
             rank = (
                 (playlist.get("owner") or {}).get("id") == me,
-                (playlist.get("tracks") or {}).get("total") or 0,
+                track_total(playlist) or 0,
             )
             if name not in best or rank > best[name][0]:
                 best[name] = (rank, playlist)
