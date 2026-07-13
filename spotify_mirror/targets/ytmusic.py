@@ -190,6 +190,9 @@ class YTMusicTarget(MirrorTarget):
     def playlist_count(self, playlist):
         return _parse_count(playlist.get("count"))
 
+    def playlist_id(self, playlist):
+        return playlist.get("playlistId")
+
     def create(self, sp_playlist):
         from .. import spotify
 

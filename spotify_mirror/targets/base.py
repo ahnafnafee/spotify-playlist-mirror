@@ -61,6 +61,10 @@ class MirrorTarget:
         to catch target-side edits when deciding a snapshot skip."""
         return None
 
+    def playlist_id(self, playlist):
+        """Stable id of a library playlist, for explicit pairing lookups."""
+        return playlist.get("id")
+
     def prefetch(self, sp_tracks, cache):
         """Optional batch work before resolving (Apple: bulk ISRC lookup)."""
 

@@ -42,3 +42,51 @@ def test_nway_wraps_accumulated_summary(monkeypatch):
     assert s["per_target"][0]["added"] == 3
     assert s["per_target"][0]["removed"] == 1
     assert s["per_target"][0]["skipped"] == 0  # defaulted keys always present
+
+
+def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
+    from spotify_mirror import archive
+    from spotify_mirror.playlists import PlaylistLink
+
+    songs = archive.connect(str(tmp_path / "s.db"))
+
+    class FakeTarget:
+        name, tag, source = "Apple Music", "apple", "apple"
+
+        def __init__(self, cache_file):
+            self.cache_file = cache_file
+
+        def list_playlists(self):  # a target playlist named differently from the source
+            return {"gym music": {"id": "t99", "attributes": {"name": "Gym Music"}}}
+
+        def playlist_id(self, pl):
+            return pl.get("id")
+
+        def playlist_count(self, pl):
+            return None
+
+        def is_editable(self, pl):
+            return True
+
+        def create(self, sp):
+            raise AssertionError("must not create; the paired target already exists")
+
+    captured = {}
+
+    def fake_mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs_, *,
+                         execute, max_removals, max_adds):
+        captured["tgt_id"] = tgt_playlist["id"]
+        return {"clean": True, "added": 1, "removed": 0, "missing": 0, "held": 0,
+                "deferred": 0, "target_count": 1}
+
+    monkeypatch.setattr(runner, "mirror_pair", fake_mirror_pair)
+
+    selected = [{"id": "sp1", "name": "Workout", "snapshot_id": "snap1"}]
+    link = PlaylistLink(name="Pair", members={"spotify": "sp1", "apple": "t99"}, id="LINK1")
+    agg = runner.run_target(FakeTarget(str(tmp_path / "c.json")), selected, lambda pid: [],
+                            songs, _opts(execute=True), links=[link])
+
+    assert captured["tgt_id"] == "t99"          # paired target used, not same-name match
+    assert agg["added"] == 1
+    assert archive.get_state(songs, "LINK1", "apple") is not None  # state keyed by the link id
+    songs.close()

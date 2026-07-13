@@ -68,40 +68,65 @@ def _summary(opts, per_target, started, *, ok=True, error=None):
     }
 
 
-def run_target(target, selected, get_sp_tracks, songs, opts):
+def _load_links():
+    """Enabled explicit pairings (empty when none configured, so behavior is
+    unchanged). Late import keeps the engine's module graph free of the web tier."""
+    from .playlists import LinkStore
+
+    return [link for link in LinkStore().list() if link.enabled]
+
+
+def run_target(target, selected, get_sp_tracks, songs, opts, links=None):
     """Mirror every selected playlist to one target. Returns an aggregate dict.
-    Raises TargetAuthError to abort the whole target (fail closed)."""
+    Raises TargetAuthError to abort the whole target (fail closed).
+
+    An explicit PlaylistLink (via `links`) overrides same-name matching: it maps a
+    Spotify playlist to a chosen target playlist by id and shares a stable state
+    key, so differently-named playlists stay paired. Unlinked playlists take the
+    same name-match path as before (empty `links` => byte-for-byte unchanged)."""
     agg = {"name": target.name, "pairs": 0, "added": 0, "removed": 0,
            "missing": 0, "held": 0, "skipped": 0, "created": 0}
     cache = load_cache(target.cache_file)
     try:
         tgt_by_name = target.list_playlists()
+        by_id = {target.playlist_id(pl): pl for pl in tgt_by_name.values() if target.playlist_id(pl)}
+        link_by_sp = {link.members["spotify"]: link for link in (links or [])
+                      if link.members.get("spotify") and target.source in link.members}
         for sp_playlist in selected:
-            key = sp_playlist["name"].strip().casefold()
-            tgt = tgt_by_name.get(key)
+            name = sp_playlist["name"]
+            link = link_by_sp.get(sp_playlist.get("id"))
+            state_key = link.id if link else name.strip().casefold()
+            paired_id = link.members.get(target.source) if link else None
+            if paired_id:                       # explicitly paired to a specific target playlist
+                tgt = by_id.get(paired_id)
+                if not tgt:
+                    log_warn(f"{name}: paired {target.name} playlist not found - skipped", tag=target.tag)
+                    continue
+            else:                               # unlinked, or linked with "create by name"
+                tgt = tgt_by_name.get(name.strip().casefold())
             if not tgt:
                 if not opts.execute:
-                    log_note(f"{sp_playlist['name']}: no {target.name} playlist yet - would create on --execute", tag=target.tag)
+                    log_note(f"{name}: no {target.name} playlist yet - would create on --execute", tag=target.tag)
                     continue
                 try:
                     tgt = target.create(sp_playlist)
                     agg["created"] += 1
-                    log_note(f"created {target.name} playlist '{sp_playlist['name']}' (name + description copied)", tag=target.tag)
+                    log_note(f"created {target.name} playlist '{name}' (name + description copied)", tag=target.tag)
                 except Exception as e:
-                    log_warn(f"create '{sp_playlist['name']}' failed: {e!r}", tag=target.tag)
+                    log_warn(f"create '{name}' failed: {e!r}", tag=target.tag)
                     continue
 
             snapshot = sp_playlist.get("snapshot_id")
             if opts.execute and snapshot:
-                state = archive.get_state(songs, key, target.source)
+                state = archive.get_state(songs, state_key, target.source)
                 current = target.playlist_count(tgt)
                 if state and state[0] == snapshot and (state[1] is None or current is None or current == state[1]):
-                    log_note(f"{sp_playlist['name']}: unchanged since last sync - skipped", tag=target.tag)
+                    log_note(f"{name}: unchanged since last sync - skipped", tag=target.tag)
                     agg["skipped"] += 1
                     continue
 
             if not target.is_editable(tgt):
-                log_warn(f"'{sp_playlist['name']}': {target.name} playlist not editable - skipped", tag=target.tag)
+                log_warn(f"'{name}': {target.name} playlist not editable - skipped", tag=target.tag)
                 continue
 
             try:
@@ -113,7 +138,7 @@ def run_target(target, selected, get_sp_tracks, songs, opts):
                 for k in ("added", "removed", "missing", "held"):
                     agg[k] += res[k]
                 if res["clean"] and snapshot:
-                    archive.set_state(songs, key, target.source, snapshot, res["target_count"])
+                    archive.set_state(songs, state_key, target.source, snapshot, res["target_count"])
             except TargetAuthError:
                 raise
             except Exception as e:
@@ -200,11 +225,12 @@ def run_pass(opts):
                 tracks_state["dirty"] = True
             return tracks
 
+    links = _load_links()  # explicit pairings override same-name matching (one-way)
     results, errors = {}, []
 
     def worker(target):
         try:
-            results[target.tag] = run_target(target, selected, get_sp_tracks, songs, opts)
+            results[target.tag] = run_target(target, selected, get_sp_tracks, songs, opts, links)
         except BaseException as e:  # surface after siblings finish
             errors.append((target, e))
 
