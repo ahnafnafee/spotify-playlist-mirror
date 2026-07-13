@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LuArrowLeft, LuArrowRight, LuCheck, LuLock } from 'react-icons/lu'
+import { LuArrowLeft, LuArrowRight, LuCheck, LuInfo } from 'react-icons/lu'
 
 import { api, errorMessage } from '@/api'
 import { PlaylistFilterField } from '@/components/settings/PlaylistFilterField'
@@ -26,6 +26,7 @@ import type { Account, Settings as SettingsMap } from '@/types'
 // it hasn't loaded in this session.
 const DEFAULTS: SettingsMap = {
   SYNC_MODE: 'oneway',
+  SYNC_SOURCE: 'spotify',
   SYNC_INTERVAL: '15m',
   PROVIDERS: '',
   MAX_ADDS: '200',
@@ -61,6 +62,9 @@ function parseCsv(value: string): string[] {
     .filter(Boolean)
 }
 
+/** A followers/providers toggle chip — `locked` marks whichever service is
+ * currently the sync source (see `lockedSourceId`), which is always
+ * included and can't be toggled off. */
 function ProviderChip({
   account,
   checked,
@@ -85,7 +89,7 @@ function ProviderChip({
         !connected
           ? `Connect ${account.name} on the Accounts page to include it in syncing.`
           : locked
-            ? `${account.name} is always included — every sync is built around it.`
+            ? `${account.name} is the sync source — always included, and it's never modified.`
             : undefined
       }
       className={cn(
@@ -103,7 +107,46 @@ function ProviderChip({
         <span className={cn('size-2 shrink-0 rounded-full', tagDot(account.id))} aria-hidden="true" />
       )}
       {account.name}
-      {locked && connected && <LuLock className="size-3 shrink-0" aria-hidden="true" />}
+      {locked && connected && (
+        <span className="rounded-full bg-accent px-1.5 py-[1px] font-mono text-[9px] font-bold uppercase tracking-wide text-on-accent">
+          source
+        </span>
+      )}
+      {!connected && <span className="font-normal text-text-3">not connected</span>}
+    </button>
+  )
+}
+
+/** Single-select variant for the Direction step's "which provider is the
+ * source of truth" picker — same visual language as ProviderChip, but
+ * exclusive-choice (radio) rather than a toggle set. */
+function SourceChip({ account, selected, onSelect }: { account: Account; selected: boolean; onSelect: () => void }) {
+  const logoId = serviceLogoId(account.id)
+  const connected = account.state === 'connected'
+
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={connected ? selected : undefined}
+      onClick={connected ? onSelect : undefined}
+      disabled={!connected}
+      title={!connected ? `Connect ${account.name} on the Accounts page to choose it as the source.` : undefined}
+      className={cn(
+        'inline-flex h-9 items-center gap-2 rounded-chip border-[1.5px] px-3 text-[13px] font-semibold transition-colors duration-fast',
+        !connected
+          ? 'cursor-not-allowed border-dashed border-border text-text-3 opacity-60'
+          : selected
+            ? 'border-accent bg-accent-soft text-accent'
+            : 'border-border-strong text-text-2 hover:bg-surface-2',
+      )}
+    >
+      {logoId ? (
+        <ServiceLogo service={logoId} className={cn('size-4 shrink-0', connected && tagText(account.id))} />
+      ) : (
+        <span className={cn('size-2 shrink-0 rounded-full', tagDot(account.id))} aria-hidden="true" />
+      )}
+      {account.name}
       {!connected && <span className="font-normal text-text-3">not connected</span>}
     </button>
   )
@@ -190,6 +233,16 @@ export default function Sync() {
 
   const syncPeers = useMemo(() => (accounts ?? []).filter((a) => SYNC_PEER_IDS.includes(a.id)), [accounts])
   const connectedPeerIds = useMemo(() => syncPeers.filter((a) => a.state === 'connected').map((a) => a.id), [syncPeers])
+  const jellyfinConnected = useMemo(() => (accounts ?? []).some((a) => a.id === 'jellyfin' && a.state === 'connected'), [accounts])
+
+  // The configurable one-way source of truth (backend default: spotify).
+  // Only meaningful in one-way mode — N-way has no single source, so
+  // nothing is locked there even if a non-default SYNC_SOURCE was saved
+  // from an earlier one-way session.
+  const syncSource = form?.SYNC_SOURCE || 'spotify'
+  const lockedSourceId = form?.SYNC_MODE === 'nway' ? null : syncSource
+  const nonSpotifySourceConflict =
+    form?.SYNC_MODE !== 'nway' && syncSource !== 'spotify' && (Boolean(form?.DOWNLOAD_DIR?.trim()) || jellyfinConnected)
 
   // PROVIDERS defaults to "every connected peer" until the user actually
   // touches a chip — at that point it becomes an explicit, saved list. This
@@ -202,9 +255,9 @@ export default function Sync() {
   }, [providersCsv, connectedPeerIds])
 
   function toggleProvider(id: string) {
-    if (id === 'spotify') return // the hub — never toggleable
+    if (id === lockedSourceId) return // the source — never toggleable
     const next = new Set(enabledProviders)
-    next.add('spotify') // materializing an explicit list must never drop the hub
+    if (lockedSourceId) next.add(lockedSourceId) // materializing an explicit list must never drop the source
     if (next.has(id)) next.delete(id)
     else next.add(id)
     setField('PROVIDERS', [...next].join(','))
@@ -236,9 +289,10 @@ export default function Sync() {
   const isLastStep = step === STEPS.length - 1
 
   const enabledPeerNames = useMemo(
-    () => syncPeers.filter((a) => a.id === 'spotify' || enabledProviders.has(a.id)).map((a) => a.name),
-    [syncPeers, enabledProviders],
+    () => syncPeers.filter((a) => a.id === lockedSourceId || enabledProviders.has(a.id)).map((a) => a.name),
+    [syncPeers, enabledProviders, lockedSourceId],
   )
+  const sourceName = useMemo(() => syncPeers.find((a) => a.id === syncSource)?.name ?? 'Spotify', [syncPeers, syncSource])
 
   // The final step's plain-English recap — segments that don't apply (no
   // download mirror configured) are omitted rather than shown empty.
@@ -248,9 +302,13 @@ export default function Sync() {
     segments.push(syncStatus ? (syncStatus.scheduled ? `Every ${form.SYNC_INTERVAL || '?'}` : 'Manual only') : '…')
     segments.push(form.SYNC_MODE === 'nway' ? 'bidirectional (N-way)' : 'one-way')
 
-    const others = enabledPeerNames.filter((n) => n !== 'Spotify')
-    const arrow = form.SYNC_MODE === 'nway' ? '⇄' : '→'
-    segments.push(others.length > 0 ? `Spotify ${arrow} ${others.join(', ')}` : 'Spotify only')
+    if (form.SYNC_MODE === 'nway') {
+      // No single source in N-way — just list who's included.
+      segments.push(enabledPeerNames.length > 0 ? enabledPeerNames.join(' ⇄ ') : 'no services selected')
+    } else {
+      const others = enabledPeerNames.filter((n) => n !== sourceName)
+      segments.push(others.length > 0 ? `${sourceName} → ${others.join(', ')}` : `${sourceName} only`)
+    }
 
     const playlistNames = parseCsv(form.PLAYLISTS ?? '')
     if (playlistNames.length === 0) segments.push('all playlists')
@@ -262,7 +320,7 @@ export default function Sync() {
     if (form.DOWNLOAD_DIR?.trim()) segments.push(`downloading to ${form.DOWNLOAD_DIR.trim()}`)
 
     return segments
-  }, [form, syncStatus, enabledPeerNames])
+  }, [form, syncStatus, enabledPeerNames, sourceName])
 
   async function save() {
     if (!form || !formValid) return
@@ -311,24 +369,55 @@ export default function Sync() {
             <p className="text-xs leading-relaxed text-text-3">{STEPS[step].intro}</p>
 
             {step === 0 && (
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                <RadioCard
-                  name="sync-mode"
-                  value="oneway"
-                  checked={form.SYNC_MODE !== 'nway'}
-                  onChange={() => setField('SYNC_MODE', 'oneway')}
-                  title="One-way →"
-                  description="Spotify is the source of truth. Apple Music and YouTube Music follow — Spotify is never modified."
-                />
-                <RadioCard
-                  name="sync-mode"
-                  value="nway"
-                  checked={form.SYNC_MODE === 'nway'}
-                  onChange={() => setField('SYNC_MODE', 'nway')}
-                  title="Bidirectional (N-way) ⇄"
-                  description="A track added or removed on any connected service propagates to all the others."
-                />
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  <RadioCard
+                    name="sync-mode"
+                    value="oneway"
+                    checked={form.SYNC_MODE !== 'nway'}
+                    onChange={() => setField('SYNC_MODE', 'oneway')}
+                    title="One-way →"
+                    description="One provider is the source of truth — everyone else follows it, and it's never modified."
+                  />
+                  <RadioCard
+                    name="sync-mode"
+                    value="nway"
+                    checked={form.SYNC_MODE === 'nway'}
+                    onChange={() => setField('SYNC_MODE', 'nway')}
+                    title="Bidirectional (N-way) ⇄"
+                    description="A track added or removed on any connected service propagates to all the others."
+                  />
+                </div>
+
+                {form.SYNC_MODE !== 'nway' && (
+                  <div className="flex flex-col gap-2.5 border-t border-border pt-3.5">
+                    <div>
+                      <span className="text-[12.5px] font-semibold text-text-2">Source of truth</span>
+                      <p className="mt-1 text-xs leading-relaxed text-text-3">
+                        This provider's playlists are the source of truth — every other service follows it, and it's
+                        never modified.
+                      </p>
+                    </div>
+                    <div role="radiogroup" aria-label="Source of truth" className="flex flex-wrap gap-2">
+                      {syncPeers.map((account) => (
+                        <SourceChip
+                          key={account.id}
+                          account={account}
+                          selected={syncSource === account.id}
+                          onSelect={() => setField('SYNC_SOURCE', account.id)}
+                        />
+                      ))}
+                    </div>
+                    {nonSpotifySourceConflict && (
+                      <p className="flex items-start gap-1.5 text-xs leading-relaxed text-text-3">
+                        <LuInfo className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                        Local downloads + Jellyfin covers currently require Spotify as the source — they'll be
+                        skipped.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {step === 1 && (
@@ -337,8 +426,8 @@ export default function Sync() {
                   <ProviderChip
                     key={account.id}
                     account={account}
-                    checked={account.id === 'spotify' || enabledProviders.has(account.id)}
-                    locked={account.id === 'spotify'}
+                    checked={account.id === lockedSourceId || enabledProviders.has(account.id)}
+                    locked={account.id === lockedSourceId}
                     onToggle={() => toggleProvider(account.id)}
                   />
                 ))}
