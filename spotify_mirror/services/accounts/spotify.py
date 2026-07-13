@@ -14,8 +14,10 @@ class SpotifyConnector(Connector):
     name = "Spotify"
     auth_kind = "oauth_redirect"
     config_fields = [
-        Field("SPOTIFY_CLIENT_ID", "Client ID", help="From your Spotify app dashboard"),
-        Field("SPOTIFY_CLIENT_SECRET", "Client secret", secret=True),
+        Field("SPOTIFY_CLIENT_ID", "Client ID",
+              help="From your app at developer.spotify.com/dashboard → Settings"),
+        Field("SPOTIFY_CLIENT_SECRET", "Client secret", secret=True,
+              help="Same page — click 'View client secret'"),
     ]
 
     def _token_cache(self):

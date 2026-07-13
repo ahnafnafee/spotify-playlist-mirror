@@ -13,10 +13,11 @@ class AppleConnector(Connector):
     auth_kind = "token_paste"
     config_fields = [
         Field("APPLE_BEARER_TOKEN", "Bearer token", secret=True,
-              help="music.apple.com → DevTools → Network → any amp-api request → Authorization header"),
+              help="Value of the 'authorization' request header"),
         Field("APPLE_USER_TOKEN", "Media-User-Token", secret=True,
-              help="Same requests → media-user-token header"),
-        Field("APPLE_STOREFRONT", "Storefront", required=False, help="e.g. us"),
+              help="Value of the 'media-user-token' request header"),
+        Field("APPLE_STOREFRONT", "Storefront", required=False,
+              help="Your country code, e.g. us"),
     ]
 
     def status(self) -> ConnStatus:

@@ -16,8 +16,9 @@ class YTMusicConnector(Connector):
     auth_kind = "oauth_device"
     config_fields = [
         Field("YTMUSIC_OAUTH_CLIENT_ID", "OAuth client ID",
-              help="Google Cloud → 'TVs and Limited Input devices' OAuth client"),
-        Field("YTMUSIC_OAUTH_CLIENT_SECRET", "OAuth client secret", secret=True),
+              help="Google Cloud OAuth client, type 'TVs and Limited Input devices'"),
+        Field("YTMUSIC_OAUTH_CLIENT_SECRET", "OAuth client secret", secret=True,
+              help="Same OAuth client's secret"),
     ]
 
     def _auth_file(self):
@@ -55,6 +56,13 @@ class YTMusicConnector(Connector):
             raw = creds.token_from_code(dc.device_code)
         except Exception as e:
             return ConnStatus("unconfigured", f"waiting for authorization ({e!r})")
+        # Before the user authorizes, token_from_code returns an error dict
+        # (e.g. {"error": "authorization_pending"}) instead of raising. Building a
+        # RefreshingToken from that 500s the poll — which stops the UI's poll loop
+        # even though auth later succeeds. Treat a non-token response as "keep waiting".
+        if not isinstance(raw, dict) or "access_token" not in raw:
+            detail = raw.get("error", "pending") if isinstance(raw, dict) else "pending"
+            return ConnStatus("unconfigured", f"waiting for authorization ({detail})")
         params = set(inspect.signature(RefreshingToken.__init__).parameters) - {"self", "credentials", "_local_cache"}
         token = RefreshingToken(credentials=creds, **{k: v for k, v in raw.items() if k in params})
         path = self._auth_file()
