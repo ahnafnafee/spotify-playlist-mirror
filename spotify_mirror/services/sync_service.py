@@ -25,6 +25,7 @@ class SyncService:
         self._settings = settings
         self._bus = bus
         self._running = False
+        self._running_mode = None  # "preview" | "execute" while a pass runs, else None
         self._task = None
         self._stopping = False
         self._last_summary = None
@@ -38,6 +39,7 @@ class SyncService:
             self._emit("note", "a pass is already running — request coalesced", "sync")
             return
         self._running = True
+        self._running_mode = "execute" if execute else "preview"
         try:
             async with self._lock:  # serialize with transfers
                 self._settings.apply_to_env()
@@ -53,6 +55,7 @@ class SyncService:
             self._emit("warn", f"pass failed: {e!r}", "sync")
         finally:
             self._running = False
+            self._running_mode = None
 
     async def run_exclusive(self, fn):
         """Run a blocking engine op (a transfer) serialized with syncs — it queues
@@ -89,6 +92,7 @@ class SyncService:
     def status(self):
         return {
             "running": self._running,
+            "mode": self._running_mode,
             "scheduled": self._task is not None and not self._task.done(),
             "interval_s": self._interval_s(),
             "next_run_at": self._next_run_at,

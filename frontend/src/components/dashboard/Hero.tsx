@@ -61,16 +61,21 @@ function lastRunText(status: SyncStatus | null): string {
  * never claims a fake "N of M checked" percentage. */
 export function Hero({ accounts, status, displayName }: HeroProps) {
   if (status?.running) {
+    const previewing = status.mode === 'preview'
     return (
       <div className="flex flex-1 flex-col justify-center gap-3">
         <span className="inline-flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.14em] text-accent">
           <span className="size-2 animate-pulse rounded-full bg-accent" aria-hidden="true" />
-          SYNCING NOW
+          {previewing ? 'PREVIEWING NOW' : 'SYNCING NOW'}
         </span>
-        <h1 className="text-display text-[26px] text-text sm:text-[32px]">Syncing your libraries…</h1>
+        <h1 className="text-display text-[26px] text-text sm:text-[32px]">
+          {previewing ? 'Previewing your libraries…' : 'Syncing your libraries…'}
+        </h1>
         <p className="flex items-center gap-2 text-sm text-text-2">
           <LuClock className="size-4 shrink-0 text-text-3" aria-hidden="true" />
-          You can leave this page — it keeps running in the background.
+          {previewing
+            ? 'A dry run — checking what would change, without touching your libraries.'
+            : 'You can leave this page — it keeps running in the background.'}
         </p>
       </div>
     )
