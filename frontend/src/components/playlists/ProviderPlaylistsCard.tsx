@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 import type { ProviderPlaylistsEntry } from '@/hooks/useProviderPlaylists'
 import { cn } from '@/lib/cn'
-import { serviceLogoId, tagText } from '@/lib/constants'
+import { serviceLogoId, tagText, UNOWNED_PLAYLIST_REASON } from '@/lib/constants'
 import { formatTrackCount } from '@/lib/format'
 import type { Account } from '@/types'
 
@@ -70,6 +70,14 @@ export function ProviderPlaylistsCard({ account, entry }: { account: Account; en
               </span>
               <CoverArt image={p.image} />
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-text">{p.name}</span>
+              {p.owned === false && (
+                <span
+                  title={UNOWNED_PLAYLIST_REASON}
+                  className="shrink-0 rounded-chip bg-neutral-soft px-2 py-0.5 font-mono text-[10px] font-semibold text-neutral"
+                >
+                  Followed
+                </span>
+              )}
               {formatTrackCount(p.count) && (
                 <span className="shrink-0 font-mono text-[11.5px] text-text-3">{formatTrackCount(p.count)}</span>
               )}

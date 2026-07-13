@@ -27,7 +27,31 @@ def test_browse_normalizes_rows(monkeypatch, tmp_path):
 
     monkeypatch.setattr("spotify_mirror.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("apple")
-    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": ""}]
+    # Non-Spotify providers list only the user's own library, so owned is always True.
+    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": "", "owned": True}]
+
+
+def test_browse_flags_unowned_spotify(monkeypatch, tmp_path):
+    # Spotify also lists followed playlists; those (owner != me) are flagged
+    # owned=False so the UI can mark them non-transferable.
+    from spotify_mirror.services.playlists import PlaylistService
+    from spotify_mirror.services.settings import SettingsStore
+
+    class FakeSpotify:
+        def list_playlists(self):
+            return {"mine": {"id": "1", "name": "Mine", "owner": {"id": "me"}},
+                    "theirs": {"id": "2", "name": "Theirs", "owner": {"id": "other"}}}
+
+        def playlist_count(self, pl):
+            return None
+
+        def is_editable(self, pl):
+            return (pl.get("owner") or {}).get("id") == "me"
+
+    monkeypatch.setattr("spotify_mirror.services.playlists.spotify.client", lambda *a, **k: object())
+    monkeypatch.setattr("spotify_mirror.services.playlists.build_one", lambda pid, opts, sp=None: FakeSpotify())
+    rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("spotify")
+    assert {r["name"]: r["owned"] for r in rows} == {"Mine": True, "Theirs": False}
 
 
 def test_pl_image_extraction():

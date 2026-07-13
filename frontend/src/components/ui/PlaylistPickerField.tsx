@@ -30,6 +30,11 @@ interface PlaylistPickerFieldProps {
   onChange: (id: string) => void
   disabled?: boolean
   placeholder?: string
+  /** Per-option override: return a short reason (e.g. "Not transferable") to
+   * grey the option out and block selecting it, or `undefined` to leave it
+   * selectable. Omit entirely for pickers where every fetched playlist is
+   * always selectable (e.g. the transfer destination deck). */
+  optionDisabledReason?: (playlist: ProviderPlaylist) => string | undefined
 }
 
 /** A single-select playlist picker that — unlike a native `<select>` — can
@@ -38,7 +43,17 @@ interface PlaylistPickerFieldProps {
  * an `overflow-hidden` ancestor (the transfer "deck" cards are one). Closes
  * on Escape, an outside click, or scroll/resize (simpler and just as usable
  * as continuously repositioning). */
-export function PlaylistPickerField({ label, help, playlists, loading, value, onChange, disabled, placeholder = 'Choose a playlist…' }: PlaylistPickerFieldProps) {
+export function PlaylistPickerField({
+  label,
+  help,
+  playlists,
+  loading,
+  value,
+  onChange,
+  disabled,
+  placeholder = 'Choose a playlist…',
+  optionDisabledReason,
+}: PlaylistPickerFieldProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [panelPos, setPanelPos] = useState<PanelPosition | null>(null)
@@ -168,26 +183,40 @@ export function PlaylistPickerField({ label, help, playlists, loading, value, on
               {filtered.length === 0 ? (
                 <p className="px-2 py-3 text-center text-xs text-text-3">No playlists match "{search}".</p>
               ) : (
-                filtered.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    role="option"
-                    aria-selected={p.id === value}
-                    onClick={() => select(p.id)}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors duration-fast',
-                      p.id === value ? 'bg-accent-soft' : 'hover:bg-surface-2',
-                    )}
-                  >
-                    <CoverArt image={p.image} />
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{p.name}</span>
-                    {formatTrackCount(p.count) && (
-                      <span className="shrink-0 font-mono text-[11px] text-text-3">{formatTrackCount(p.count)}</span>
-                    )}
-                    {p.id === value && <LuCheck className="size-3.5 shrink-0 text-accent" aria-hidden="true" />}
-                  </button>
-                ))
+                filtered.map((p) => {
+                  const reason = optionDisabledReason?.(p)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      role="option"
+                      aria-selected={p.id === value}
+                      aria-disabled={reason ? true : undefined}
+                      disabled={Boolean(reason)}
+                      title={reason}
+                      onClick={() => select(p.id)}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors duration-fast',
+                        reason
+                          ? 'cursor-not-allowed opacity-50'
+                          : p.id === value
+                            ? 'bg-accent-soft'
+                            : 'hover:bg-surface-2',
+                      )}
+                    >
+                      <CoverArt image={p.image} />
+                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{p.name}</span>
+                      {reason ? (
+                        <span className="shrink-0 font-mono text-[10.5px] text-text-3">{reason}</span>
+                      ) : (
+                        formatTrackCount(p.count) && (
+                          <span className="shrink-0 font-mono text-[11px] text-text-3">{formatTrackCount(p.count)}</span>
+                        )
+                      )}
+                      {p.id === value && <LuCheck className="size-3.5 shrink-0 text-accent" aria-hidden="true" />}
+                    </button>
+                  )
+                })
               )}
             </div>
           </div>,

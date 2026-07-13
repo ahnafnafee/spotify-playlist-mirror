@@ -73,7 +73,12 @@ class PlaylistService:
             return []
         rows = [
             {"id": _pl_id(pl), "name": _pl_name(pl), "count": target.playlist_count(pl),
-             "image": _pl_image(pl)}
+             "image": _pl_image(pl),
+             # Spotify also lists *followed* (non-owned) playlists, whose tracks the
+             # API forbids reading (403) — so they can't be copied. Flag ownership so
+             # the UI can mark them non-transferable. Other providers list only the
+             # user's own library, so those are always owned.
+             "owned": target.is_editable(pl) if provider_id == "spotify" else True}
             for pl in by_name.values()
         ]
         return sorted(rows, key=lambda r: (r["name"] or "").casefold())

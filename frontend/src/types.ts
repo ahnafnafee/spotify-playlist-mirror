@@ -90,6 +90,9 @@ export interface SyncStatus {
   /** Epoch seconds of the next scheduled pass, or `null` when auto-sync is
    * paused (or nothing has ever been scheduled). */
   next_run_at?: number | null
+  /** While a pass runs: "preview" (dry run — checks everything, changes
+   * nothing) or "execute" (a real sync); null/absent when idle. */
+  mode?: 'preview' | 'execute' | null
 }
 
 export interface RunResponse {
@@ -117,12 +120,17 @@ export interface SyncEvent {
 /** GET /api/playlists?provider=<id> — one entry per playlist on that service.
  * `image` is a cover-art URL and may be an empty string (no art available).
  * `count` is `null` when the service doesn't expose a track count cheaply
- * (Apple Music) — never render the literal "null", see formatTrackCount(). */
+ * (Apple Music) — never render the literal "null", see formatTrackCount().
+ * `owned` is Spotify-only: `false` marks a playlist the connected user
+ * follows but doesn't own, which Spotify's API refuses to return tracks for
+ * (403) — treat a missing/undefined value as owned; other providers never
+ * send this field. */
 export interface ProviderPlaylist {
   id: string
   name: string
   count: number | null
   image: string
+  owned?: boolean
 }
 
 export type LinkDirection = 'oneway' | 'nway'

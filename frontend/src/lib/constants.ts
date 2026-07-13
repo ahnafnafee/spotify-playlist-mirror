@@ -114,6 +114,11 @@ export const KIND_STYLES: Record<EventKind, KindStyle> = {
   section: { glyph: '', tileBg: '', tileText: '', text: 'text-text-3' },
 }
 
+/** Why a `ProviderPlaylist` with `owned === false` (Spotify-only, see
+ * types.ts) can be browsed but not copied — shown wherever that playlist is
+ * tagged, so the explanation stays identical across surfaces. */
+export const UNOWNED_PLAYLIST_REASON = "Spotify won't let apps copy playlists you don't own."
+
 export const DOWNLOAD_FORMAT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'Default (MP3)' },
   { value: 'mp3', label: 'MP3' },

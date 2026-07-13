@@ -4,7 +4,7 @@ import { api, errorMessage } from '@/api'
 import type { ProviderPlaylistsEntry } from '@/hooks/useProviderPlaylists'
 import { cn } from '@/lib/cn'
 import { serviceLogoId, tagLabel, tagText } from '@/lib/constants'
-import type { Account, StartTransferRequest } from '@/types'
+import type { Account, ProviderPlaylist, StartTransferRequest } from '@/types'
 
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
@@ -33,6 +33,13 @@ const DEST_MODE_OPTIONS = [
 function serviceIcon(providerId: string) {
   const logoId = serviceLogoId(providerId)
   return logoId ? <ServiceLogo service={logoId} className={`size-4 ${tagText(providerId)}`} /> : undefined
+}
+
+/** A transfer can only ever read from a playlist the connected account owns
+ * — Spotify's API 403s on tracks for a merely-followed playlist. Only the
+ * source deck needs this; copying INTO a followed/other playlist is fine. */
+function sourceDisabledReason(p: ProviderPlaylist): string | undefined {
+  return p.owned === false ? 'Not transferable' : undefined
 }
 
 export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
@@ -70,7 +77,11 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
   const destPlaylist = destMode === 'existing' ? entries[destProvider]?.playlists.find((p) => p.id === destPlaylistId) : undefined
 
   const formValid = Boolean(
-    sourceProvider && sourcePlaylistId && destProvider && (destMode === 'create' ? destName.trim() : destPlaylistId),
+    sourceProvider &&
+      sourcePlaylistId &&
+      sourcePlaylist?.owned !== false &&
+      destProvider &&
+      (destMode === 'create' ? destName.trim() : destPlaylistId),
   )
 
   async function handleStart() {
@@ -140,6 +151,7 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
                   value={sourcePlaylistId}
                   disabled={!sourceProvider}
                   onChange={setSourcePlaylistId}
+                  optionDisabledReason={sourceDisabledReason}
                 />
               </div>
               {sourcePlaylist && (
