@@ -10,6 +10,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -37,8 +38,10 @@ def create_app(settings=None, bus=None, sync_service=None, links=None, transfers
     async def lifespan(app: FastAPI):
         bus.bind_loop(asyncio.get_running_loop())
         bus.attach_to_logs()
-        # Point the engine at the managed env file and apply current settings so
-        # wizard-saved values win over any stale .env.
+        # Surface the gitignored config (.env / docker env_file) to os.getenv so
+        # the settings API shows the actual running defaults; the managed env
+        # file + settings.json then take precedence.
+        load_dotenv()
         os.environ["OMNI_ENV_FILE"] = settings.env_path
         settings.apply_to_env()
         await sync_service.start()

@@ -30,6 +30,14 @@ def test_settings_roundtrip_masks_secrets(tmp_path):
         assert "SPOTIFY_CLIENT_SECRET" not in got  # secret never echoed back
 
 
+def test_settings_falls_back_to_env(tmp_path, monkeypatch):
+    # A key absent from settings.json is filled from the process env (a docker
+    # env_file / .env), so the UI shows the actual running config.
+    monkeypatch.setenv("MAX_ADDS", "321")
+    with TestClient(_app(tmp_path)) as client:
+        assert client.get("/api/settings").json()["MAX_ADDS"] == "321"
+
+
 def test_sync_run_queues(tmp_path, monkeypatch):
     import spotify_mirror.services.sync_service as m
 
