@@ -27,7 +27,7 @@ Or run it directly:
 
 ```bash
 uv sync
-uv run uvicorn spotify_mirror.web:app --host 0.0.0.0 --port 8080
+uv run uvicorn omni_sync.web:app --host 0.0.0.0 --port 8080
 # frontend hot-reload during development: pnpm -C frontend install && pnpm -C frontend dev
 ```
 
@@ -543,10 +543,10 @@ Removals are destructive, so they're guarded:
 
 ## Project layout
 
-Runnable as `uv run main.py` (thin shim) or `python -m spotify_mirror`.
+Runnable as `uv run main.py` (thin shim) or `python -m omni_sync`.
 
 ```text
-spotify_mirror/
+omni_sync/
   cli.py         # entry: parse args, run once or loop
   runner.py      # build targets, run each in its own thread, then downloads
   config.py      # constants, env, CLI options

@@ -29,7 +29,7 @@
 
 ## Task P3-2: transfer() engine function
 
-**Files:** Create `spotify_mirror/transfers.py`; `tests/test_transfers.py`.
+**Files:** Create `omni_sync/transfers.py`; `tests/test_transfers.py`.
 **Produces:** `transfer(source, dest, src_pl, dest_pl, cache, songs, *, execute, max_adds) -> {added, deferred, not_found:[{name,artist,key}]}`.
 
 - [ ] Normalize both sides via `base._normalize`. Build `present_keys` from dest via `spotify_track_keys`.
@@ -39,7 +39,7 @@
 
 ## Task P3-3: TransferService + SyncService serialization
 
-**Files:** `spotify_mirror/transfers.py` (TransferService); modify `sync_service.py`; `tests/test_transfers.py`.
+**Files:** `omni_sync/transfers.py` (TransferService); modify `sync_service.py`; `tests/test_transfers.py`.
 **Produces:** `SyncService.run_exclusive(fn)` (awaits a shared lock — transfers queue, never coalesce-drop). `TransferService(settings, bus, sync)` with `submit(spec)->job_id`, `get(job_id)`, `resolve(job_id, key, dest_id)`; jobs in-memory (`{id, status, source, dest, result, conflicts}`).
 
 - [ ] SyncService: add `self._lock = asyncio.Lock()`; wrap the pass in `run_now` with `async with self._lock`; add `run_exclusive(fn)` = `async with self._lock: return await asyncio.to_thread(fn)`. Existing coalesce test stays green.
@@ -49,7 +49,7 @@
 
 ## Task P3-4: Web routers
 
-**Files:** `spotify_mirror/web/routers/transfers.py`; wire in `web/__init__.py`; `tests/test_web.py`.
+**Files:** `omni_sync/web/routers/transfers.py`; wire in `web/__init__.py`; `tests/test_web.py`.
 **Produces:** `POST /api/transfers {source, source_playlist, dest, dest_playlist|dest_name}` → `{job_id}`; `GET /api/transfers/{id}` → job + conflicts; `POST /api/transfers/{id}/resolve {key, dest_id}`.
 
 - [ ] App factory constructs `TransferService` (needs settings, bus, sync) → `app.state.transfers`.

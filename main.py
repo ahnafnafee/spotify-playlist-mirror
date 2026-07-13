@@ -1,7 +1,7 @@
 """Thin entry shim so `uv run main.py` keeps working; logic lives in the
-spotify_mirror package (also runnable as `python -m spotify_mirror`)."""
+omni_sync package (also runnable as `python -m omni_sync`)."""
 
-from spotify_mirror.cli import main
+from omni_sync.cli import main
 
 if __name__ == "__main__":
     main()

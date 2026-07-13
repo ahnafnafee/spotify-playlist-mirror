@@ -30,4 +30,4 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]   # so tests/ can import the spotify_mirror package
+pythonpath = ["."]   # so tests/ can import the omni_sync package

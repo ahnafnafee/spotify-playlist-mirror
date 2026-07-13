@@ -2,9 +2,9 @@
 
 from fastapi.testclient import TestClient
 
-from spotify_mirror.services.settings import SettingsStore
-from spotify_mirror.services.syncs import SyncStore
-from spotify_mirror.web import create_app
+from omni_sync.services.settings import SettingsStore
+from omni_sync.services.syncs import SyncStore
+from omni_sync.web import create_app
 
 
 def _app(tmp_path):
@@ -52,7 +52,7 @@ def test_spotify_redirect_uri_forces_loopback_ip(tmp_path):
 
 
 def test_sync_run_queues(tmp_path, monkeypatch):
-    import spotify_mirror.services.sync_service as m
+    import omni_sync.services.sync_service as m
 
     async def fake(opts):
         return {"ok": True, "per_target": []}
@@ -82,7 +82,7 @@ def test_events_route_registered(tmp_path):
 
 
 def test_links_crud(tmp_path):
-    from spotify_mirror.services.playlists import LinkStore
+    from omni_sync.services.playlists import LinkStore
 
     app = create_app(settings=SettingsStore(dir=tmp_path), links=LinkStore(dir=tmp_path))
     with TestClient(app) as client:
@@ -110,7 +110,7 @@ def test_syncs_crud_and_seed(tmp_path):
 
 
 def test_transfers_start_and_status(tmp_path, monkeypatch):
-    from spotify_mirror.services.transfers import TransferService
+    from omni_sync.services.transfers import TransferService
 
     # No providers -> the job errors fast (no network); exercises the REAL submit
     # path (asyncio.create_task) so the async-endpoint requirement can't regress.
@@ -127,8 +127,8 @@ def test_transfers_start_and_status(tmp_path, monkeypatch):
 
 
 def test_sse_payload_format():
-    from spotify_mirror.engine.logs import Event
-    from spotify_mirror.web.routers.events import _fmt
+    from omni_sync.engine.logs import Event
+    from omni_sync.web.routers.events import _fmt
 
     line = _fmt(Event(1.0, "add", "apple", "Song - Artist"))
     assert line.startswith("data: ") and line.endswith("\n\n")

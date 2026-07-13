@@ -73,7 +73,7 @@ The engine already does the hard part: a provider-agnostic `MirrorTarget` protoc
 ### Module layout
 
 ```
-spotify_mirror/
+omni_sync/
   targets/            # ENGINE: MirrorTarget + providers + reconcile
                       #   + source-normalization & playlist accessors (P3, §3.6)
                       #   + build_one() registry fn (§3.6)
@@ -338,9 +338,9 @@ Composition proof: each phase adds *services + routers + pages* plus isolated, d
 
 ## 11. Deployment
 
-- `Dockerfile` CMD → `uvicorn spotify_mirror.web:app --host 0.0.0.0 --port 8080` (LAN bind).
+- `Dockerfile` CMD → `uvicorn omni_sync.web:app --host 0.0.0.0 --port 8080` (LAN bind).
 - `docker-compose.yml`: expose `8080`; keep `./data` + music volumes; point the engine's dotenv at the managed `data/app.env`; drop the bare-loop command (SyncService owns scheduling).
-- Headless CLI (`python -m spotify_mirror --loop`) remains for non-web users.
+- Headless CLI (`python -m omni_sync --loop`) remains for non-web users.
 
 ---
 

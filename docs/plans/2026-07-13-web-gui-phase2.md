@@ -18,12 +18,12 @@
 
 ## File structure
 
-- **Create** `spotify_mirror/playlists.py` — `PlaylistService` (browse) + `PlaylistLink` dataclass + `LinkStore` (`data/links.json`).
-- **Create** `spotify_mirror/web/routers/playlists.py` — `/api/playlists`, `/api/links` CRUD.
-- **Modify** `spotify_mirror/targets/__init__.py` — `build_one(provider_id, opts, sp=None)` (hook #5).
-- **Modify** `spotify_mirror/targets/base.py` — `reconcile(..., link_key=None)` and `mirror_pair(..., link_key=None)` (hook #9).
-- **Modify** `spotify_mirror/runner.py` — consult `LinkStore`: an explicit link resolves members + reconciles under its `link_key`; no links → today's name-match path.
-- **Modify** `spotify_mirror/web/__init__.py` — include the playlists router.
+- **Create** `omni_sync/playlists.py` — `PlaylistService` (browse) + `PlaylistLink` dataclass + `LinkStore` (`data/links.json`).
+- **Create** `omni_sync/web/routers/playlists.py` — `/api/playlists`, `/api/links` CRUD.
+- **Modify** `omni_sync/targets/__init__.py` — `build_one(provider_id, opts, sp=None)` (hook #5).
+- **Modify** `omni_sync/targets/base.py` — `reconcile(..., link_key=None)` and `mirror_pair(..., link_key=None)` (hook #9).
+- **Modify** `omni_sync/runner.py` — consult `LinkStore`: an explicit link resolves members + reconciles under its `link_key`; no links → today's name-match path.
+- **Modify** `omni_sync/web/__init__.py` — include the playlists router.
 - **Frontend** `frontend/src` — Playlists page (browse + pair) — delegated to a subagent.
 - **Tests** `test_playlists.py`; extend `test_web.py`.
 
@@ -37,8 +37,8 @@
 - [ ] **Step 1: Failing test** `test_playlists.py`:
 
 ```python
-from spotify_mirror import targets
-from spotify_mirror.config import parse_args
+from omni_sync import targets
+from omni_sync.config import parse_args
 
 def test_build_one_unknown_returns_none():
     assert targets.build_one("nope", parse_args([])) is None
@@ -62,7 +62,7 @@ Add `"build_one"` to `__all__`.
 
 ## Task 2: PlaylistService.browse + /api/playlists
 
-**Files:** Create/extend `spotify_mirror/playlists.py`, `spotify_mirror/web/routers/playlists.py`; extend `test_web.py`.
+**Files:** Create/extend `omni_sync/playlists.py`, `omni_sync/web/routers/playlists.py`; extend `test_web.py`.
 **Interfaces — Produces:** `PlaylistService(settings).browse(provider_id) -> list[dict]` each `{id, name, count}`; `GET /api/playlists?provider=<id>`.
 
 - [ ] **Step 1: Failing test** in `test_playlists.py` — monkeypatch `build_one` to a fake target whose `list_playlists()` returns `{ "chill": {"id":"1","name":"Chill"} }`; assert `browse("spotify")` returns `[{"id":"1","name":"Chill","count":...}]`.
@@ -74,7 +74,7 @@ Add `"build_one"` to `__all__`.
 
 ## Task 3: PlaylistLink model + LinkStore + /api/links
 
-**Files:** extend `spotify_mirror/playlists.py`, `web/routers/playlists.py`; extend `test_playlists.py`.
+**Files:** extend `omni_sync/playlists.py`, `web/routers/playlists.py`; extend `test_playlists.py`.
 **Interfaces — Produces:**
 
 ```python

@@ -5,9 +5,9 @@ decides adds vs removes across providers) and the persistence helpers."""
 import os
 import tempfile
 
-from spotify_mirror.engine import archive
-from spotify_mirror.engine.matching import spotify_track_keys
-from spotify_mirror.engine.targets.base import _merge, reconcile
+from omni_sync.engine import archive
+from omni_sync.engine.matching import spotify_track_keys
+from omni_sync.engine.targets.base import _merge, reconcile
 
 
 # --- merge: the safety-critical set logic (per-provider prev + cur) ----------

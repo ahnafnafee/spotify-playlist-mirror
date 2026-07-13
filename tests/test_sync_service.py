@@ -2,13 +2,13 @@
 
 import asyncio
 
-from spotify_mirror.services.events import EventBus
-from spotify_mirror.services.settings import SettingsStore
-from spotify_mirror.services.syncs import SyncJob, SyncStore
+from omni_sync.services.events import EventBus
+from omni_sync.services.settings import SettingsStore
+from omni_sync.services.syncs import SyncJob, SyncStore
 
 
 def _svc(tmp_path, bus):
-    import spotify_mirror.services.sync_service as m
+    import omni_sync.services.sync_service as m
 
     store = SyncStore(dir=tmp_path)
     job = store.upsert(SyncJob(name="J"))
@@ -19,7 +19,7 @@ def test_run_job_coalesces(monkeypatch, tmp_path):
     calls = []
 
     async def scenario():
-        import spotify_mirror.services.sync_service as m
+        import omni_sync.services.sync_service as m
 
         async def fake_pass(opts):
             calls.append("start")
@@ -41,7 +41,7 @@ def test_run_job_coalesces(monkeypatch, tmp_path):
 
 def test_run_job_records_failure(monkeypatch, tmp_path):
     async def scenario():
-        import spotify_mirror.services.sync_service as m
+        import omni_sync.services.sync_service as m
 
         async def boom(opts):
             raise RuntimeError("nope")

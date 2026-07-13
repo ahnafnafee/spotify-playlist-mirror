@@ -26,22 +26,22 @@
 ## File structure
 
 **Engine hooks (modify):**
-- `spotify_mirror/logs.py` — add `Event` dataclass + `set_sink`; each `log_*` emits an Event.
-- `spotify_mirror/runner.py` — `run_pass` returns `PassSummary`; `_run_nway` accumulates stats.
+- `omni_sync/logs.py` — add `Event` dataclass + `set_sink`; each `log_*` emits an Event.
+- `omni_sync/runner.py` — `run_pass` returns `PassSummary`; `_run_nway` accumulates stats.
 
 **New services (create):**
-- `spotify_mirror/settings.py` — `SettingsStore`: `settings.json` ⇄ `data/app.env` ⇄ `os.environ`.
-- `spotify_mirror/events.py` — `EventBus`: loop-safe pub/sub fed by the logs sink.
-- `spotify_mirror/sync_service.py` — `SyncService`: single queue, scheduler, `run_now`, lifecycle events.
-- `spotify_mirror/accounts/__init__.py` — `CONNECTORS` registry.
-- `spotify_mirror/accounts/base.py` — `Connector` protocol, `Field`, `ConnStatus`, `DeviceCode`.
-- `spotify_mirror/accounts/spotify.py` `ytmusic.py` `apple.py` `jellyfin.py` — one connector each.
+- `omni_sync/settings.py` — `SettingsStore`: `settings.json` ⇄ `data/app.env` ⇄ `os.environ`.
+- `omni_sync/events.py` — `EventBus`: loop-safe pub/sub fed by the logs sink.
+- `omni_sync/sync_service.py` — `SyncService`: single queue, scheduler, `run_now`, lifecycle events.
+- `omni_sync/accounts/__init__.py` — `CONNECTORS` registry.
+- `omni_sync/accounts/base.py` — `Connector` protocol, `Field`, `ConnStatus`, `DeviceCode`.
+- `omni_sync/accounts/spotify.py` `ytmusic.py` `apple.py` `jellyfin.py` — one connector each.
 
 **New web layer (create):**
-- `spotify_mirror/web/__init__.py` — app factory: mount routers/static, wire sink, start scheduler.
-- `spotify_mirror/web/routers/{accounts,settings,sync,events,pages}.py`
-- `spotify_mirror/web/templates/{base,dashboard,accounts,settings}.html`
-- `spotify_mirror/web/static/{app.css,app.js,vendor/htmx.min.js,vendor/alpine.min.js}`
+- `omni_sync/web/__init__.py` — app factory: mount routers/static, wire sink, start scheduler.
+- `omni_sync/web/routers/{accounts,settings,sync,events,pages}.py`
+- `omni_sync/web/templates/{base,dashboard,accounts,settings}.html`
+- `omni_sync/web/static/{app.css,app.js,vendor/htmx.min.js,vendor/alpine.min.js}`
 
 **Deploy (modify):** `Dockerfile`, `docker-compose.yml`.
 
@@ -51,7 +51,7 @@
 
 ## Task 0: Feature branch, deps, package skeleton
 
-**Files:** Modify `pyproject.toml`; Create `spotify_mirror/web/__init__.py`, `spotify_mirror/web/routers/__init__.py`, `test_web.py`.
+**Files:** Modify `pyproject.toml`; Create `omni_sync/web/__init__.py`, `omni_sync/web/routers/__init__.py`, `test_web.py`.
 
 - [ ] **Step 1:** Branch off main: `git checkout main && git pull && git checkout -b feat/web-gui`.
 - [ ] **Step 2:** Add deps to `pyproject.toml` `dependencies`: `"fastapi>=0.115"`, `"uvicorn[standard]>=0.32"`, `"jinja2>=3.1"`. Run `uv sync`.
@@ -59,7 +59,7 @@
 
 ```python
 from fastapi.testclient import TestClient
-from spotify_mirror.web import create_app
+from omni_sync.web import create_app
 
 def test_health():
     client = TestClient(create_app())
@@ -89,13 +89,13 @@ app = create_app()
 
 ## Task 1: Event type + logs sink (engine hook #1)
 
-**Files:** Modify `spotify_mirror/logs.py`; Create `test_logs_sink.py`.
+**Files:** Modify `omni_sync/logs.py`; Create `test_logs_sink.py`.
 **Interfaces — Produces:** `logs.Event(ts, kind, tag, message, data=None)`; `logs.set_sink(fn)`; `log_*` emit an Event whose `kind` ∈ {add,remove,hold,miss,note,warn,summary,section}.
 
 - [ ] **Step 1: Write failing test** `test_logs_sink.py`:
 
 ```python
-from spotify_mirror import logs
+from omni_sync import logs
 
 def test_sink_receives_typed_events():
     seen = []
@@ -146,15 +146,15 @@ Then in each `log_*` helper, after its `log(...)` call, add `_emit("<kind>", msg
 
 ## Task 2: EventBus with thread→loop bridge (engine hook #2)
 
-**Files:** Create `spotify_mirror/events.py`; Modify `test_events.py`.
+**Files:** Create `omni_sync/events.py`; Modify `test_events.py`.
 **Interfaces — Consumes:** `logs.Event`, `logs.set_sink`. **Produces:** `EventBus.subscribe()->asyncio.Queue`, `.unsubscribe(q)`, `.publish(Event)` (thread-safe), `.recent()->list[Event]`, `.attach_to_logs()` (registers a sink that publishes).
 
 - [ ] **Step 1: Write failing test** `test_events.py` (publish from a worker thread, async subscriber receives):
 
 ```python
 import asyncio, threading
-from spotify_mirror.logs import Event
-from spotify_mirror.events import EventBus
+from omni_sync.logs import Event
+from omni_sync.events import EventBus
 
 def test_publish_from_worker_thread_reaches_subscriber():
     async def scenario():
@@ -207,7 +207,7 @@ class EventBus:
 
 ## Task 3: run_pass returns PassSummary (engine hook #3)
 
-**Files:** Modify `spotify_mirror/runner.py`.
+**Files:** Modify `omni_sync/runner.py`.
 **Interfaces — Produces:** `run_pass(opts) -> dict` with keys `{mode, execute, duration_s, ok, error, per_target: [{name, added, removed, missing, held, deferred, created, skipped}]}`. CLI ignores the return (unchanged).
 
 - [ ] **Step 1: Write failing test** in `test_web.py` (or new `test_runner_summary.py`) — assert the one-way path returns per-target aggregates. Use a monkeypatched `build_targets` returning a fake target and a fake `spotify.client`/`playlists_by_name` so no network is hit. (At execution: build a minimal fake `MirrorTarget` with empty playlists so a pass runs to completion instantly.)
@@ -225,7 +225,7 @@ class EventBus:
 
 ## Task 4: SettingsStore (engine hook #4)
 
-**Files:** Create `spotify_mirror/settings.py`, `test_settings.py`.
+**Files:** Create `omni_sync/settings.py`, `test_settings.py`.
 **Interfaces — Produces:** `SettingsStore(dir="data")` with `.load()->dict`, `.save(dict)`, `.get(key)`, `.env_path` (`data/app.env`), `.apply_to_env()`. `save()` writes `settings.json` AND regenerates `app.env` AND updates `os.environ`.
 
 - [ ] **Step 1: Write failing test** `test_settings.py` — the clobber regression:
@@ -233,7 +233,7 @@ class EventBus:
 ```python
 import os
 from dotenv import load_dotenv
-from spotify_mirror.settings import SettingsStore
+from omni_sync.settings import SettingsStore
 
 def test_saved_credential_survives_dotenv_reload(tmp_path):
     store = SettingsStore(dir=tmp_path)
@@ -257,24 +257,24 @@ def test_roundtrip(tmp_path):
 
 ## Task 5: SyncService (single queue + scheduler)
 
-**Files:** Create `spotify_mirror/sync_service.py`, `test_sync_service.py`.
+**Files:** Create `omni_sync/sync_service.py`, `test_sync_service.py`.
 **Interfaces — Consumes:** `runner.run_pass`, `config.Options`/`parse_args`, `settings.SettingsStore`, `events.EventBus`. **Produces:** `SyncService(settings, bus)` with async `start()`/`stop()`, `run_now(execute: bool) -> None` (coalesced), `status() -> dict`. Runs `run_pass` in a thread via `asyncio.to_thread`; publishes lifecycle Events (`kind="section"`/`"summary"` reused, or `kind="note"` with `data={"lifecycle": ...}`); enforces one pass at a time with an `asyncio.Lock` + a "busy" flag.
 
 - [ ] **Step 1: Write failing test** `test_sync_service.py` — serialization + coalesce, with a fake `run_pass` that sleeps:
 
 ```python
 import asyncio
-from spotify_mirror.sync_service import SyncService
+from omni_sync.sync_service import SyncService
 
 def test_run_now_serializes(monkeypatch, tmp_path):
     calls = []
     async def scenario():
-        import spotify_mirror.sync_service as m
+        import omni_sync.sync_service as m
         async def fake_pass(opts):
             calls.append("start"); await asyncio.sleep(0.05); calls.append("end")
         monkeypatch.setattr(m, "_run_pass_async", fake_pass)
-        from spotify_mirror.settings import SettingsStore
-        from spotify_mirror.events import EventBus
+        from omni_sync.settings import SettingsStore
+        from omni_sync.events import EventBus
         bus = EventBus(); bus.bind_loop(asyncio.get_running_loop())
         svc = SyncService(SettingsStore(dir=tmp_path), bus)
         await asyncio.gather(svc.run_now(False), svc.run_now(False))
@@ -298,8 +298,8 @@ def test_run_now_serializes(monkeypatch, tmp_path):
 - [ ] **Step 1: Write failing test** `test_connectors.py`:
 
 ```python
-from spotify_mirror.settings import SettingsStore
-from spotify_mirror.accounts import CONNECTORS
+from omni_sync.settings import SettingsStore
+from omni_sync.accounts import CONNECTORS
 
 def test_apple_status_unconfigured(tmp_path):
     store = SettingsStore(dir=tmp_path)
@@ -364,7 +364,7 @@ def test_apple_submit_stores_tokens(tmp_path, monkeypatch):
 ## Task 10: Frontend (dashboard, wizard, live view, settings)
 
 **Files:** Create `web/templates/*.html`, `web/static/app.css`, `web/static/app.js`, vendored `web/static/vendor/{htmx.min.js,alpine.min.js}`.
-**Verification is visual + smoke** (no browser test framework): TestClient asserts pages return 200 and contain anchor strings; manual check via `uv run uvicorn spotify_mirror.web:app` in the /run step.
+**Verification is visual + smoke** (no browser test framework): TestClient asserts pages return 200 and contain anchor strings; manual check via `uv run uvicorn omni_sync.web:app` in the /run step.
 
 - [ ] **Step 1:** Vendor htmx + alpine into `static/vendor/` (download the minified files; they're MIT and small). Tailwind via Play CDN `<script src="https://cdn.tailwindcss.com">` in `base.html` (LAN clients still fetch it; acceptable — or vendor a prebuilt CSS if fully-offline is required).
 - [ ] **Step 2:** `base.html` — layout shell (nav: Dashboard / Accounts / Settings), theme-aware, includes vendored JS + app.css/js.
@@ -380,8 +380,8 @@ def test_apple_submit_stores_tokens(tmp_path, monkeypatch):
 **Files:** Modify `web/__init__.py`, `Dockerfile`, `docker-compose.yml`.
 
 - [ ] **Step 1:** App factory: on startup, construct `SettingsStore`, `EventBus` (`bind_loop(asyncio.get_running_loop())`, `attach_to_logs()`), `SyncService`; store on `app.state`; `await sync.start()`. On shutdown, `await sync.stop()`. Mount routers + `StaticFiles`. Point the engine's dotenv at `data/app.env` (set `SPOTIFY_TOKEN_CACHE`/`*_FILE` defaults under `data/`).
-- [ ] **Step 2:** `Dockerfile` CMD → `["uvicorn", "spotify_mirror.web:app", "--host", "0.0.0.0", "--port", "8080"]`. `docker-compose.yml`: expose `8080:8080`, keep `./data` + music volumes, drop the bare-loop assumption (SyncService schedules).
-- [ ] **Step 3: Manual end-to-end** (use the `/run` skill or): `uv run uvicorn spotify_mirror.web:app --port 8080`, open `http://127.0.0.1:8080`, verify: dashboard loads, connect a service via the wizard, click Run now (dry-run), watch the live feed populate. Fix anything that only shows up live.
+- [ ] **Step 2:** `Dockerfile` CMD → `["uvicorn", "omni_sync.web:app", "--host", "0.0.0.0", "--port", "8080"]`. `docker-compose.yml`: expose `8080:8080`, keep `./data` + music volumes, drop the bare-loop assumption (SyncService schedules).
+- [ ] **Step 3: Manual end-to-end** (use the `/run` skill or): `uv run uvicorn omni_sync.web:app --port 8080`, open `http://127.0.0.1:8080`, verify: dashboard loads, connect a service via the wizard, click Run now (dry-run), watch the live feed populate. Fix anything that only shows up live.
 - [ ] **Step 4:** Full regression: `uv run pytest -v` (all green). Commit: `feat(web): wire app factory, scheduler startup, and Docker entrypoint`.
 - [ ] **Step 5:** Update `README.md` with a "Web GUI" quickstart section. Commit: `docs: document the web GUI quickstart`.
 
