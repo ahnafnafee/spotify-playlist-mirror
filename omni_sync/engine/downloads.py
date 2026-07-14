@@ -523,6 +523,8 @@ def _stream_spotdl(cmd, folder, timeout_s):
                 log_miss(f"no audio source: {line.split(':', 1)[-1].strip()}", tag="local")
             elif line.startswith("--- Logging error") or "charmap_encode" in line or line.startswith("self.handleError"):
                 continue  # spotDL child logging noise (defused by the UTF-8 env above)
+            elif "reinitializing song" in line or "Could not get artist by ID" in line:
+                continue  # spotDL's transient metadata re-fetch (Spotify API blips); it retries, so not a real failure
             elif "rror" in line or "Exception" in line:  # Error / *Error
                 log_warn(line[:200], tag="local")
         proc.wait()
