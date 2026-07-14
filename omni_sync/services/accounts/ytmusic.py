@@ -22,7 +22,9 @@ class YTMusicConnector(Connector):
     ]
 
     def _auth_file(self):
-        return self._store.get("YTMUSIC_AUTH_FILE") or "data/ytmusic_oauth.json"
+        # os.getenv first so Docker's YTMUSIC_AUTH_FILE=/data/... (the persistent
+        # volume) wins over a relative default that would land in an ephemeral dir.
+        return os.getenv("YTMUSIC_AUTH_FILE") or self._store.get("YTMUSIC_AUTH_FILE") or "data/ytmusic_oauth.json"
 
     def _creds(self):
         from ytmusicapi.auth.oauth import OAuthCredentials

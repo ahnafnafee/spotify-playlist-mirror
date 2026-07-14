@@ -50,6 +50,20 @@ def test_settings_store_uses_data_dir_env(tmp_path, monkeypatch):
     assert SettingsStore().get("SPOTIFY_CLIENT_ID") == "cid"  # a fresh store reads it back
 
 
+def test_connector_token_paths_follow_env(tmp_path, monkeypatch):
+    # In Docker these env vars point at the /data volume; the connectors must honor
+    # them so tokens land on the persistent volume (and where the engine reads
+    # them), not a relative ./data that's ephemeral inside the container.
+    from omni_sync.services.accounts.spotify import SpotifyConnector
+    from omni_sync.services.accounts.ytmusic import YTMusicConnector
+
+    monkeypatch.setenv("SPOTIFY_TOKEN_CACHE", str(tmp_path / "sp_token"))
+    monkeypatch.setenv("YTMUSIC_AUTH_FILE", str(tmp_path / "yt.json"))
+    store = SettingsStore(dir=tmp_path)
+    assert SpotifyConnector(store)._token_cache() == str(tmp_path / "sp_token")
+    assert YTMusicConnector(store)._auth_file() == str(tmp_path / "yt.json")
+
+
 def test_spotify_redirect_uri_forces_loopback_ip(tmp_path):
     # Spotify rejects `localhost` for http loopback redirects — the callback URI
     # must be normalized to the explicit 127.0.0.1 IP no matter how the app is

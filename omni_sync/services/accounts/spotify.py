@@ -21,11 +21,16 @@ class SpotifyConnector(Connector):
     ]
 
     def _token_cache(self):
-        return self._store.get("SPOTIFY_TOKEN_CACHE") or "data/spotify_token_cache"
+        # os.getenv first so Docker's SPOTIFY_TOKEN_CACHE=/data/... (the persistent
+        # volume, and where the engine reads the token) wins over a relative default
+        # that would resolve to an ephemeral, possibly-missing dir in the container.
+        return os.getenv("SPOTIFY_TOKEN_CACHE") or self._store.get("SPOTIFY_TOKEN_CACHE") or "data/spotify_token_cache"
 
     def _oauth(self, redirect_uri):
         from spotipy.oauth2 import SpotifyOAuth
 
+        cache = self._token_cache()
+        os.makedirs(os.path.dirname(cache) or ".", exist_ok=True)  # spotipy silently skips caching if the parent dir is missing
         # Request the full read+write set up front. Reads cover the user's own
         # private and collaborative playlists (followed playlists stay unreadable —
         # that's a Spotify dev-mode limit, not a scope gap). Modify is needed
@@ -39,7 +44,7 @@ class SpotifyConnector(Connector):
             client_secret=self._store.get("SPOTIFY_CLIENT_SECRET"),
             redirect_uri=redirect_uri,
             scope=scope,
-            cache_path=self._token_cache(),
+            cache_path=cache,
             open_browser=False,
         )
 
