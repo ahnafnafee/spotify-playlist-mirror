@@ -1,14 +1,22 @@
 name: omni-playlist-sync   # compose project (group) name
 
 services:
-  mirror:
+  web:
     build: .
     container_name: omni-playlist-sync
-    env_file: .env
+    # A .env is OPTIONAL — every service is configured in the browser and saved
+    # under ./data. Keep a .env only to preset things like DOWNLOAD_DIR or
+    # credentials. (`required: false` needs Docker Compose v2.24+; on older
+    # versions either create an empty `.env` or drop the `path:`/`required:` keys.)
+    env_file:
+      - path: .env
+        required: false
     ports:
-      - "8080:8080"   # web GUI (LAN-only — do not port-forward to the internet)
+      # Web GUI at http://<host>:8888 (host 8888 -> container 8080).
+      # LAN-only — do NOT port-forward this to the internet (the UI has no login).
+      - "8888:8080"
     environment:
-      OMNI_ENV_FILE: /data/app.env   # SettingsStore's managed env; wizard saves win
+      OMNI_ENV_FILE: /data/app.env   # SettingsStore's managed env; wizard saves win over any .env
       SPOTIFY_TOKEN_CACHE: /data/spotify_token_cache
       APPLE_CACHE_FILE: /data/apple_resolve_cache.json
       SONG_CACHE_FILE: /data/song_cache.db
@@ -26,3 +34,10 @@ services:
       - ./data:/data
       - "${DOWNLOAD_DIR:-./downloads}:/music"
     restart: unless-stopped
+    healthcheck:
+      # `docker ps` shows healthy/unhealthy once the web app answers /health.
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

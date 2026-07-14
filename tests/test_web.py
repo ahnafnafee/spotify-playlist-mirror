@@ -51,6 +51,22 @@ def test_spotify_redirect_uri_forces_loopback_ip(tmp_path):
         assert r.json()["redirect_uri"] == "http://127.0.0.1:8080/oauth/spotify/callback"
 
 
+def test_spotify_redirect_uri_reflects_access_port(tmp_path):
+    # Behind Docker the UI is published on a different host port (8888 -> 8080).
+    # The redirect URI is derived from the port the BROWSER used (the Host header,
+    # which the port-forward preserves), so it must reflect 8888 — that's the URI
+    # the connect wizard shows the user to whitelist, and it stays consistent
+    # between the authorize step and the token exchange.
+    store = SettingsStore(dir=tmp_path)
+    store.save({"SPOTIFY_CLIENT_ID": "cid", "SPOTIFY_CLIENT_SECRET": "sec"})
+    with TestClient(create_app(settings=store), base_url="http://localhost:8888") as client:
+        assert client.post("/api/accounts/spotify/connect").json()["redirect_uri"] == (
+            "http://127.0.0.1:8888/oauth/spotify/callback"
+        )
+        # begin_redirect persists the exact URI complete_redirect will reuse.
+        assert store.get("SPOTIFY_REDIRECT_URI") == "http://127.0.0.1:8888/oauth/spotify/callback"
+
+
 def test_sync_run_queues(tmp_path, monkeypatch):
     import omni_sync.services.sync_service as m
 
