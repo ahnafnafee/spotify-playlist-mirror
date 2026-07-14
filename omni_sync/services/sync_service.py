@@ -64,7 +64,7 @@ class SyncService:
         if job is None:
             return
         if job_id in self._active:
-            self._emit("note", f"{job.name}: already running — request coalesced", "sync")
+            self._emit("note", f"{job.name}: already running or queued — request coalesced", "sync")
             return
         self._active.add(job_id)
         try:
@@ -161,6 +161,10 @@ class SyncService:
         return {
             "id": job.id, "name": job.name, "enabled": job.enabled,
             "running": self._running_job == job.id,
+            # Triggered but waiting behind the shared lock for the running pass to
+            # finish — passes are serialized (shared caches/archive/rate limits),
+            # so a second "Sync now" queues rather than overlaps.
+            "queued": job.id in self._active and self._running_job != job.id,
             "next_run_at": self._next_run.get(job.id),
             "last": self._last.get(job.id),
         }
