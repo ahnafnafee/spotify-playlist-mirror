@@ -71,7 +71,7 @@ export function Modal({ open, onClose, title, description, children, footer, wid
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay sm:items-start sm:p-4 sm:pt-[max(4vh,1rem)]">
       <button type="button" aria-label="Close dialog" className="absolute inset-0" onClick={onClose} />
       <div
         ref={dialogRef}
@@ -80,7 +80,24 @@ export function Modal({ open, onClose, title, description, children, footer, wid
         aria-labelledby="modal-title"
         tabIndex={-1}
         className={cn(
-          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-modal border border-border-strong bg-surface shadow-lg outline-none',
+          // Top-anchored (not vertically centered) on desktop: growing step
+          // content only ever extends the dialog downward from a fixed top
+          // edge, capping at max-h and scrolling the body from there, rather
+          // than re-centering (and creeping the top edge up, eventually
+          // above the viewport) on every content-height change. See
+          // SyncWizard's Playlists step for the case that surfaced this.
+          //
+          // overflow-clip, not overflow-hidden: `hidden` still makes this a
+          // valid scroll container for browser-driven scrolling (e.g. a
+          // deeply nested item - a playlist checkbox scrolled well down its
+          // own list - receiving focus and the browser walking every
+          // scrollable ancestor to bring it into view), just without a
+          // visible scrollbar or wheel response. That silently moved this
+          // dialog's own scrollTop, shoving the header/footer out of place
+          // while its outer box never budged. `clip` establishes no scroll
+          // container at all, so only the body's own overflow-y-auto (and
+          // the nested playlist list's) can ever actually scroll.
+          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-clip rounded-t-modal border border-border-strong bg-surface shadow-lg outline-none',
           'sm:max-h-[90vh] sm:rounded-modal',
           widthClassName,
         )}
