@@ -37,7 +37,7 @@ A free, open-source, **self-hosted alternative to Soundiiz, TuneMyMusic, and Fre
 
 </div>
 
-> \[!NOTE]
+> [!NOTE]
 > **Web app + headless CLI, one engine.** Click through a browser UI to connect services, build syncs, and transfer playlists — or run it `.env` + cron style. Both drive the same sync core.
 
 <details>
@@ -85,7 +85,7 @@ Omni Playlist Sync keeps your playlists identical everywhere without manual re-a
 - 🗃️ **Ever-growing song archive** — every track ever seen is recorded in a local SQLite database (name, artist, album, ISRC, raw metadata, first/last seen).
 - 🐳 **Runs anywhere** — one `docker compose up -d` for the browser app, or plain CLI + cron / Task Scheduler.
 
-> \[!IMPORTANT]
+> [!IMPORTANT]
 > **Self-hosted and private by design.** Your listening data and credentials never leave your machine. The web UI has **no login** — bind it to your LAN and don't port-forward it to the internet.
 
 <div align="right">
