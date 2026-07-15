@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LuClock, LuPause, LuPencil, LuPlay, LuSquare, LuTrash2 } from 'react-icons/lu'
+import { LuClock, LuPencil, LuTrash2 } from 'react-icons/lu'
 
 import { api, errorMessage } from '@/api'
 import { Button } from '@/components/ui/Button'
@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn'
 import { buildSyncSummaryRows } from '@/lib/syncSummary'
 import type { Account, SyncJob } from '@/types'
 
+import { SyncControls } from './SyncControls'
 import { SyncRunButtons } from './SyncRunButtons'
 
 interface Props {
@@ -27,6 +28,8 @@ interface Props {
   /** Its last pass was cut short by Pause, per `jobs[].paused` — shows a Resume
    * button (re-runs; reconcile is idempotent so it picks up the remainder). */
   paused: boolean
+  /** While running, a pause/stop requested but not yet in effect ("Pausing…"). */
+  pending: 'pause' | 'stop' | null
   onEdit: () => void
   onChanged: () => void
 }
@@ -37,29 +40,11 @@ interface Props {
  * (matching AccountCard's pattern) — the wizard (via Edit) is the only
  * place the job's actual config fields are changed; this card is for
  * at-a-glance management. */
-export function SyncJobCard({ job, peers, running, queued, paused, onEdit, onChanged }: Props) {
+export function SyncJobCard({ job, peers, running, queued, paused, pending, onEdit, onChanged }: Props) {
   const [togglingEnabled, setTogglingEnabled] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [controlling, setControlling] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Pause/Stop a running pass, or Resume a paused one — the mid-run counterpart to
-  // the schedule on/off toggle above. Halts at the next playlist boundary.
-  async function control(action: 'pause' | 'stop' | 'resume') {
-    setControlling(true)
-    setError(null)
-    try {
-      if (action === 'pause') await api.pauseSyncJob(job.id)
-      else if (action === 'stop') await api.stopSyncJob(job.id)
-      else await api.resumeSyncJob(job.id)
-      onChanged()
-    } catch (err) {
-      setError(errorMessage(err))
-    } finally {
-      setControlling(false)
-    }
-  }
 
   const summary = buildSyncSummaryRows(job, peers)
     .filter((r) => r.label !== 'Schedule')
@@ -140,39 +125,7 @@ export function SyncJobCard({ job, peers, running, queued, paused, onEdit, onCha
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <SyncRunButtons job={job} disabled={running || queued} onChanged={onChanged} />
-        {running && (
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={controlling}
-              icon={<LuPause className="size-3.5" aria-hidden="true" />}
-              onClick={() => void control('pause')}
-            >
-              Pause
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={controlling}
-              icon={<LuSquare className="size-3.5" aria-hidden="true" />}
-              onClick={() => void control('stop')}
-            >
-              Stop
-            </Button>
-          </>
-        )}
-        {paused && !running && (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={controlling}
-            icon={<LuPlay className="size-3.5" aria-hidden="true" />}
-            onClick={() => void control('resume')}
-          >
-            Resume
-          </Button>
-        )}
+        <SyncControls jobId={job.id} running={running} paused={paused} pending={pending} onChanged={onChanged} onError={setError} />
         <Button variant="secondary" size="sm" icon={<LuPencil className="size-3.5" aria-hidden="true" />} onClick={onEdit}>
           Edit
         </Button>

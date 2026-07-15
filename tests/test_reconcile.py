@@ -236,6 +236,20 @@ def test_large_removals_held_back_by_default_then_drain_when_opted_in(tmp_path):
     conn.close()
 
 
+def test_reconcile_interrupt_freezes_baseline(tmp_path):
+    # A Pause/Stop mid-reconcile must NOT advance the per-provider baseline — a
+    # partial advance could resurrect a track via union_prev on the next pass.
+    conn = archive.connect(str(tmp_path / "s.db"))
+    sp, ap = _P("spotify", ["A", "B", "C"]), _P("apple", ["A"])
+    control = iter(["run"])  # allow the first check, then "stop" (default) interrupts the pass
+    reconcile([sp, ap], "Mix", {"spotify": {"id": "s"}, "apple": {"id": "a"}},
+              _caches("spotify", "apple"), conn, execute=True, max_removals=25, max_adds=200,
+              should_continue=lambda: next(control, "stop"))
+    assert archive.get_playlist_state(conn, "mix", "spotify") == set()  # frozen, not advanced
+    assert archive.get_playlist_state(conn, "mix", "apple") == set()
+    conn.close()
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:

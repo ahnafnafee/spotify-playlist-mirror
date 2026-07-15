@@ -139,7 +139,7 @@ def run_target(target, selected, get_source_tracks, songs, opts, links=None, sou
                 res = mirror_pair(
                     target, get_source_tracks(sp_playlist), sp_playlist, tgt, cache, songs,
                     execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds,
-                    drain_removals=opts.apply_large_removals,
+                    drain_removals=opts.apply_large_removals, should_continue=should_continue,
                     source_key=src_key, source_name=source.name, name=name,
                 )
                 agg["pairs"] += 1
@@ -386,7 +386,7 @@ def _run_nway(opts, sp, selected, songs, should_continue=None):
             try:
                 stats = reconcile(active, name, playlists, caches, songs,
                                   execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds,
-                                  drain_removals=opts.apply_large_removals)
+                                  drain_removals=opts.apply_large_removals, should_continue=should_continue)
                 for k in total:
                     total[k] += stats.get(k, 0)
             except TargetAuthError:

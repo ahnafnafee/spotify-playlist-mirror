@@ -116,7 +116,7 @@ class MirrorTarget:
 
 
 def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, execute, max_removals,
-                max_adds, drain_removals=False, source_key="spotify", source_name="Spotify", name=None):
+                max_adds, drain_removals=False, should_continue=None, source_key="spotify", source_name="Spotify", name=None):
     """Reconcile one source→target playlist pair. Returns a stats dict; `clean`
     is True when everything applied with no guard tripped.
 
@@ -146,7 +146,11 @@ def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, e
     # Resolve additions to target ids, preserving the oldest-first order.
     present = {target.track_id(t) for t in tgt_tracks if target.track_id(t)}
     additions, not_found, new_links, methods = [], [], {}, {}
+    stopped_early = False
     for i, track in enumerate(to_add, 1):
+        if should_continue and should_continue() != "run":
+            stopped_early = True  # Pause/Stop — defer the rest; keep the pass "not clean" below
+            break
         label = f"{track['name']} - {', '.join(track['artists'])}"
         tid = links.get(track.get("id"))
         method = "link" if tid else None
@@ -173,7 +177,7 @@ def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, e
     if source_key == "spotify":
         archive.set_links(songs, target.source, new_links)  # keep the shared table Spotify-anchored
 
-    guard = False
+    guard = stopped_early  # a pause mid-resolve must not advance the snapshot (a re-run finishes it)
     deferred = 0
     if len(additions) > max_adds:
         deferred = len(additions) - max_adds
@@ -302,7 +306,7 @@ def _merge(prev, cur, collapsed):
 
 
 def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, max_adds,
-              drain_removals=False, link_key=None):
+              drain_removals=False, should_continue=None, link_key=None):
     """Reconcile one logical playlist across N provider peers, bidirectionally.
 
     playlists: {source: playlist dict}; caches: {source: resolution cache}.
@@ -350,9 +354,13 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
     stats = {"clean": execute and not collapsed, "added": 0, "removed": 0, "missing": 0,
              "held": 0, "deferred": 0, "removals_skipped": 0}
     removals_capped = False   # any provider's removals hit the cap -> freeze the baseline
+    interrupted = False       # a Pause/Stop mid-pass -> freeze the baseline too (partial advance is unsafe)
     new_links = {p.source: {} for p in peers}
     new_state = {}   # source -> canonical membership to persist (only when the baseline is safe)
     for p in peers:
+        if should_continue and should_continue() != "run":
+            interrupted = True  # Pause/Stop — skip the remaining providers this pass
+            break
         if p.source in collapsed:
             continue  # untrusted read: don't write to it this pass (guards adds too, not just removes)
         add_ids, remove_ids = plan[p.source]
@@ -367,6 +375,9 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
             log_warn(f"{p.name} prefetch failed: {e!r}", tag=p.tag)
         additions, not_found = [], []
         for norm in sorted(add_norms, key=lambda n: n["added_at"]):
+            if should_continue and should_continue() != "run":
+                interrupted = True  # Pause/Stop — defer this provider's remaining adds
+                break
             if spotify_track_keys(norm) & present_keys[p.source]:
                 continue  # song already on the provider under a different id — no dupe, and no wasted search
             try:
@@ -448,7 +459,7 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
         # capped — deferred ADDS don't block it (they stay in `desired` via union_prev
         # and re-add next pass), which is what lets removals activate on the pass after
         # an add-heavy bootstrap instead of only after the whole backlog drains.
-        if not collapsed and not removals_capped:
+        if not collapsed and not removals_capped and not interrupted:
             for src, ids in new_state.items():
                 archive.set_playlist_state(songs, key, src, ids)
 

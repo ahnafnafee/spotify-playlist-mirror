@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { LuArrowRight } from 'react-icons/lu'
 
+import { SyncControls } from '@/components/sync/SyncControls'
 import { SyncRunButtons } from '@/components/sync/SyncRunButtons'
 import { formatClockTime } from '@/lib/format'
 import { buildSyncSummaryRows, syncPeersOf } from '@/lib/syncSummary'
@@ -55,6 +56,8 @@ export function SyncsPanel({
             const jobStatus = status?.jobs.find((j) => j.id === job.id)
             const running = jobStatus?.running ?? false
             const queued = jobStatus?.queued ?? false
+            const paused = jobStatus?.paused ?? false
+            const pending = jobStatus?.pending ?? null
             return (
               <li key={job.id} className="flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 flex-1">
@@ -74,7 +77,10 @@ export function SyncsPanel({
                   <p className="mt-0.5 truncate text-xs text-text-3">{summary}</p>
                   <p className="mt-0.5 font-mono text-[10px] tracking-wide text-text-3">Next run: {nextRunText(job, status)}</p>
                 </div>
-                <SyncRunButtons job={job} disabled={running || queued} onChanged={onChanged} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <SyncRunButtons job={job} disabled={running || queued} onChanged={onChanged} />
+                  <SyncControls jobId={job.id} running={running} paused={paused} pending={pending} onChanged={onChanged} />
+                </div>
               </li>
             )
           })}

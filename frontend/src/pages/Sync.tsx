@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { LuPlus } from 'react-icons/lu'
 
+import { LiveFeed } from '@/components/dashboard/LiveFeed'
 import { SyncJobCard } from '@/components/sync/SyncJobCard'
 import { SyncWizard } from '@/components/sync/SyncWizard'
 import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { LoadingStatus, Skeleton } from '@/components/ui/Skeleton'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -74,6 +76,7 @@ export default function Sync() {
               running={status?.jobs.find((j) => j.id === job.id)?.running ?? false}
               queued={status?.jobs.find((j) => j.id === job.id)?.queued ?? false}
               paused={status?.jobs.find((j) => j.id === job.id)?.paused ?? false}
+              pending={status?.jobs.find((j) => j.id === job.id)?.pending ?? null}
               onEdit={() => openEdit(job)}
               onChanged={refreshAll}
             />
@@ -89,6 +92,12 @@ export default function Sync() {
             </Button>
           }
         />
+      )}
+
+      {syncs && syncs.length > 0 && (
+        <Card className="p-4 sm:p-5">
+          <LiveFeed />
+        </Card>
       )}
 
       <SyncWizard

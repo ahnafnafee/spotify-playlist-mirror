@@ -210,6 +210,9 @@ class SyncService:
             "queued": job.id in self._active and self._running_job != job.id,
             # Its last pass was cut short by Pause and can be resumed (re-run).
             "paused": self._interrupted.get(job.id) == "paused",
+            # A pause/stop requested on the running job but not yet in effect (it
+            # halts at the next checkpoint) — drives the "Pausing…" indicator.
+            "pending": self._control if (self._running_job == job.id and self._control != "run") else None,
             "next_run_at": self._next_run.get(job.id),
             "last": self._last.get(job.id),
         }

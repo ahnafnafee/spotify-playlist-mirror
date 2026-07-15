@@ -102,6 +102,9 @@ export interface SyncJobStatus {
   queued: boolean
   /** Its last pass was cut short by Pause and can be resumed (re-run). */
   paused: boolean
+  /** While running, a pause/stop requested but not yet in effect (it halts at the
+   * next checkpoint) — drives the "Pausing…" / "Stopping…" label. */
+  pending: 'pause' | 'stop' | null
   next_run_at: number | null
   last: PassSummary | null
 }
