@@ -236,6 +236,163 @@ def test_large_removals_held_back_by_default_then_drain_when_opted_in(tmp_path):
     conn.close()
 
 
+class _VariantPeer:
+    """Peer holding ONE copy of a song under provider-flavored metadata
+    (decorated title, partial or embellished artist credits). resolve() returns
+    a catalog id different from the library id already in the playlist — the
+    real-world shape that let re-adds slip past the seen-id guard."""
+
+    def __init__(self, source, track, resolve_id):
+        self.source = self.tag = self.name = source
+        self._track = track
+        self._resolve_id = resolve_id
+        self.added, self.removed = [], []
+
+    def playlist_tracks(self, pl):
+        return [dict(self._track)]
+
+    def track_id(self, t):
+        return t.get("id")
+
+    def prefetch(self, norms, cache):
+        pass
+
+    def native_isrc_map(self, cache):
+        return {}
+
+    def resolve(self, norm, cache):
+        return self._resolve_id, "search"
+
+    def add(self, pl, ids):
+        self.added.extend(ids)
+
+    def remove(self, pl, raw):
+        self.removed.append(raw)
+
+
+def _arcane_peers():
+    """One song, three provider-flavored copies: Spotify lists every artist plus
+    the ISRC; Apple joins the artists into one embellished string; YT credits
+    only the primary. Without alias unification each shape becomes its own
+    canonical id."""
+    name = "To Ashes and Blood (from the series Arcane League of Legends)"
+    sp = _VariantPeer("spotify", {"id": "sp-lib", "name": name,
+                                  "artists": ["Woodkid", "Arcane", "League of Legends"],
+                                  "artist": "Woodkid, Arcane, League of Legends",
+                                  "duration_ms": 246000, "isrc": "X1", "added_at": "2020"}, "sp-cat")
+    ap = _VariantPeer("apple", {"id": "ap-lib", "name": name,
+                                "artist": "Woodkid, Arcane, League of Legends Music",
+                                "duration_ms": 246000, "isrc": None, "added_at": "2020"}, "ap-cat")
+    yt = _VariantPeer("ytmusic", {"id": "yt-lib", "name": name, "artists": ["Woodkid"],
+                                  "artist": "Woodkid", "duration_ms": 246000, "isrc": None,
+                                  "added_at": "2020"}, "yt-cat")
+    return sp, ap, yt
+
+
+def test_alias_variants_do_not_duplicate_across_providers(tmp_path):
+    # Every provider already HAS the song; a pass must be a no-op. Before alias
+    # unification, the k: identities from Apple/YT metadata sat in `desired`
+    # and were re-added elsewhere via search — duplicating the song on services
+    # that already had it, every pass.
+    conn = archive.connect(str(tmp_path / "s.db"))
+    sp, ap, yt = _arcane_peers()
+    stats = reconcile([sp, ap, yt], "Mix", {p.source: {"id": p.source} for p in (sp, ap, yt)},
+                      _caches("spotify", "apple", "ytmusic"), conn,
+                      execute=True, max_removals=25, max_adds=200)
+    assert stats["added"] == 0 and stats["removed"] == 0
+    assert sp.added == [] and ap.added == [] and yt.added == []
+    for src in ("spotify", "apple", "ytmusic"):  # baseline stores ONE unified identity, not three
+        assert archive.get_playlist_state(conn, "mix", src) == {"i:X1"}
+    conn.close()
+
+
+def test_alias_flip_never_removes_the_real_track(tmp_path):
+    # A provider's canonical for a song can FLIP between passes (an ISRC or link
+    # appears where only a fuzzy key existed). The retired alias then reads as a
+    # user deletion and the very-much-present song gets removed from the other
+    # providers. Unification maps the stored alias forward instead.
+    conn = archive.connect(str(tmp_path / "s.db"))
+    name = "Ma Meilleure Ennemie"
+    stale = "k:ma meilleure ennemie|stromae pomme arcane"
+    archive.set_playlist_state(conn, "mix", "spotify", {"i:Z9"})
+    archive.set_playlist_state(conn, "mix", "apple", {stale})
+    archive.set_playlist_state(conn, "mix", "ytmusic", {stale})
+    sp = _VariantPeer("spotify", {"id": "sp-lib", "name": name, "artists": ["Stromae", "Pomme"],
+                                  "artist": "Stromae, Pomme", "duration_ms": 178000,
+                                  "isrc": "Z9", "added_at": "2020"}, "sp-cat")
+    ap = _VariantPeer("apple", {"id": "ap-lib", "name": name,
+                                "artist": "Stromae, Pomme, Arcane", "duration_ms": 178000,
+                                "isrc": None, "added_at": "2020"}, "ap-cat")
+    yt = _VariantPeer("ytmusic", {"id": "yt-lib", "name": name, "artists": ["Stromae", "Pomme"],
+                                  "artist": "Stromae, Pomme", "duration_ms": 178000,
+                                  "isrc": "Z9",  # the flip: yt now reads an ISRC it didn't have
+                                  "added_at": "2020"}, "yt-cat")
+    stats = reconcile([sp, ap, yt], "Mix", {p.source: {"id": p.source} for p in (sp, ap, yt)},
+                      _caches("spotify", "apple", "ytmusic"), conn,
+                      execute=True, max_removals=25, max_adds=200)
+    assert stats["removed"] == 0 and ap.removed == [] and yt.removed == []
+    assert stats["added"] == 0
+    conn.close()
+
+
+def test_unify_never_merges_different_songs():
+    # Same title, different artists (a cover on a label channel) must stay two
+    # canonical identities — unification is for provider-flavored metadata of
+    # ONE song, never for genuinely different recordings by different artists.
+    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+
+    orig = _normalize({"name": "Another Day in Paradise", "artists": ["Phil Collins"], "isrc": "P1"}, "spotify")
+    cover = _normalize({"name": "Another Day in Paradise",
+                        "artists": ["Thriller Records", "Kailee Morgue"]}, "ytmusic")
+    alias = _unify_aliases({
+        "spotify": {"i:P1": orig},
+        "ytmusic": {"k:another day in paradise|thriller records kailee morgue": cover},
+    })
+    assert alias == {}
+
+
+def test_unify_folds_reordered_and_embellished_artist_credits():
+    # Live-data shape: Spotify credits "Arcane, Woodkid" while Apple credits
+    # "Woodkid, Arcane, League of Legends Music" — same song, reordered AND
+    # embellished. The composite key's | separator must not block the match by
+    # fusing different neighbor tokens together.
+    from omni_sync.engine.matching import track_key
+    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+
+    name = "To Ashes and Blood (from the series Arcane League of Legends)"
+    sp = _normalize({"name": name, "artist": "Arcane, Woodkid", "isrc": "X1"}, "spotify")
+    ap = _normalize({"name": name, "artist": "Woodkid, Arcane, League of Legends Music"}, "apple")
+    kid = f"k:{track_key(name, 'Woodkid, Arcane, League of Legends Music')}"
+    alias = _unify_aliases({"spotify": {"i:X1": sp}, "apple": {kid: ap}})
+    assert alias == {kid: "i:X1"}
+
+
+def test_order_history_records_dedupes_and_prunes(tmp_path, monkeypatch):
+    conn = archive.connect(str(tmp_path / "s.db"))
+    stamps = iter(f"2026-01-01T00:00:{i:02d}+00:00" for i in range(60))
+    monkeypatch.setattr(archive, "_now", lambda: next(stamps))
+    archive.record_order(conn, "mix", "spotify", [["t1", "One", "A"]])
+    archive.record_order(conn, "mix", "spotify", [["t1", "One", "A"]])  # unchanged -> no new row
+    assert len(archive.get_order_history(conn, "mix", "spotify")) == 1
+    for i in range(2, 20):
+        archive.record_order(conn, "mix", "spotify", [["t1", "One", "A"]] * i)
+    hist = archive.get_order_history(conn, "mix", "spotify")
+    assert len(hist) == archive.ORDER_HISTORY_KEEP        # pruned to the retention cap
+    assert len(hist[0][1]) == 19                          # newest first, latest snapshot intact
+    assert archive.get_order_history(conn, "mix", "apple") == []  # scoped per source
+    conn.close()
+
+
+def test_reconcile_records_order_history(tmp_path):
+    conn = archive.connect(str(tmp_path / "s.db"))
+    peers = [_FakePeer("spotify"), _FakePeer("apple")]
+    reconcile(peers, "Mix", {"spotify": {"id": "s1"}, "apple": {"id": "a1"}},
+              _caches("spotify", "apple"), conn, execute=True, max_removals=25, max_adds=200)
+    hist = archive.get_order_history(conn, "mix", "spotify")
+    assert hist and hist[0][1] == [["spotify1", "Song", "A"]]  # ordered [id, name, artist] rows
+    conn.close()
+
+
 def test_reconcile_interrupt_freezes_baseline(tmp_path):
     # A Pause/Stop mid-reconcile must NOT advance the per-provider baseline — a
     # partial advance could resurrect a track via union_prev on the next pass.

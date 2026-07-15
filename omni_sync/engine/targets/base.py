@@ -16,7 +16,7 @@ from ..logs import (
     fmt_counts, fmt_secs, log_add, log_hold, log_miss, log_note, log_remove,
     log_section, log_summary, log_warn, paint,
 )
-from ..matching import compute_diff, protect_removals, spotify_track_keys, track_key
+from ..matching import compute_diff, fuzzy_in, protect_removals, romanized, spotify_track_keys, track_key
 
 # A provider reading fewer than this fraction of the known baseline is treated
 # as a broken read: its removals are ignored so one bad fetch can't cascade a
@@ -133,6 +133,8 @@ def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, e
 
     archive.upsert_many(songs, source_key, sp_tracks)
     archive.upsert_many(songs, target.source, tgt_tracks)
+    archive.record_order(songs, name.strip().casefold(), target.source,
+                         [[target.track_id(t), t.get("name", ""), t.get("artist", "")] for t in tgt_tracks])
 
     links = (archive.get_links(songs, target.source, [t.get("id") for t in sp_tracks])
              if source_key == "spotify" else {})
@@ -281,6 +283,57 @@ def _canonicalize(target, tracks, songs, cache, key2isrc):
     return out
 
 
+def _unify_aliases(canon):
+    """{alias_cid: winner_cid} — fold fuzzy-key (k:) canonicals into the hard
+    (i:/s:) — or first k: — identity of the same song across providers.
+
+    The same song canonicalizes differently per provider whenever hard ids are
+    missing and the metadata is provider-flavored: decorated titles ("(Official
+    Audio)"), partial or embellished artist credits ("Woodkid" vs "Woodkid,
+    Arcane, League of Legends Music"). Left split, every alias is its own
+    `desired` member that other providers appear to lack — re-added via search
+    as a duplicate each pass — and a flip between aliases reads as a user
+    deletion. Matching: any exact spotify_track_keys overlap, else the same
+    composite-key fuzzy tolerance the one-way removal guard trusts. Hard ids
+    never merge with each other — two ISRCs are two recordings."""
+    keysets = {}
+    for by_cid in canon.values():
+        for cid, norm in by_cid.items():
+            keysets.setdefault(cid, set()).update(spotify_track_keys(norm))
+    soft = sorted(cid for cid in keysets if cid.startswith("k:"))
+    if not soft:
+        return {}
+    hard = sorted((cid for cid in keysets if not cid.startswith("k:")),
+                  key=lambda c: (not c.startswith("i:"), c))  # prefer an ISRC winner
+    by_key = {}
+    for cid in hard:
+        for k in keysets[cid]:
+            by_key.setdefault(k, cid)
+    # For the fuzzy comparison, the "name|artist" separator must become a space
+    # (left in, it fuses different neighbor tokens on each side — "legends|woodkid"
+    # vs "legends|arcane" — and blocks matches on mere credit reordering), and a
+    # romanized variant joins each side so cross-script copies of one song match.
+    def _variants(k):
+        k = k.replace("|", " ")
+        return {k, romanized(k)}
+
+    flat = {cid: set().union(*(_variants(k) for k in ks)) for cid, ks in keysets.items()}
+    alias, anchors = {}, []  # anchors: surviving k: ids (matched pairwise, never chained)
+    for cid in soft:
+        qs = _variants(cid[2:])
+        winner = next((by_key[k] for k in sorted(keysets[cid]) if k in by_key), None)
+        if not winner:
+            winner = next((h for h in hard if any(fuzzy_in(q, flat[h]) for q in qs)), None)
+        if not winner:
+            winner = next((a for a in anchors
+                           if keysets[cid] & keysets[a] or any(fuzzy_in(q, flat[a]) for q in qs)), None)
+        if winner:
+            alias[cid] = winner
+        else:
+            anchors.append(cid)
+    return alias
+
+
 def _merge(prev, cur, collapsed):
     """Pure delta merge over PER-PROVIDER state. prev, cur: {source:
     set(canonical_id)} — each provider's membership after the last clean pass
@@ -321,18 +374,33 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
 
     canon = {}         # source -> {canonical_id: normalized track}
     present = {}       # source -> set of ALL current target ids (not canonical-deduped)
-    present_keys = {}  # source -> set of track_keys already on the provider (dupe guard)
     key2isrc = {}      # track_key -> ISRC, seeded by any ISRC-bearing provider (peers are ISRC-rich first)
     for p in peers:
         raw = p.playlist_tracks(playlists[p.source])
         archive.upsert_many(songs, p.source, raw)
+        archive.record_order(songs, key, p.source,
+                             [[p.track_id(t), t.get("name", ""),
+                               t.get("artist") or ", ".join(t.get("artists") or [])] for t in raw])
         present[p.source] = {p.track_id(t) for t in raw if p.track_id(t)}
         canon[p.source] = _canonicalize(p, raw, songs, caches[p.source], key2isrc)
-        present_keys[p.source] = set().union(*(spotify_track_keys(n) for n in canon[p.source].values())) \
-            if canon[p.source] else set()
         for cid, norm in canon[p.source].items():
             if cid.startswith("i:"):  # any provider that resolved an ISRC anchors the rest
                 key2isrc.setdefault(track_key(norm["name"], norm["artist"]), cid[2:])
+
+    # One identity per song: fold provider-flavored aliases together BEFORE any
+    # membership math, and map the stored baseline through the same table so a
+    # retired alias is never mistaken for a deletion.
+    alias = _unify_aliases(canon)
+    if alias:
+        for src, by_cid in canon.items():
+            merged = {}
+            for cid, norm in by_cid.items():
+                merged.setdefault(alias.get(cid, cid), norm)
+            canon[src] = merged
+        prev = {src: {alias.get(cid, cid) for cid in ids} for src, ids in prev.items()}
+    present_keys = {  # source -> track_keys already on the provider (dupe guard)
+        src: set().union(*(spotify_track_keys(n) for n in by_cid.values())) if by_cid else set()
+        for src, by_cid in canon.items()}
     cur = {src: set(m) for src, m in canon.items()}
 
     repr_ = {}  # canonical_id -> representative track (peers are ordered spotify-first for ISRC-rich reprs)

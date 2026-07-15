@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS playlist_state (
     PRIMARY KEY (playlist, source, canonical_id)
 )
 """,
+    # Ordered per-provider snapshots of each playlist, kept as a short history.
+    # A recovery / forensics trail (what did this playlist look like, in order,
+    # and when) — the sync logic itself never reads these back.
+    """
+CREATE TABLE IF NOT EXISTS playlist_order (
+    playlist    TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    tracks      TEXT NOT NULL,
+    PRIMARY KEY (playlist, source, captured_at)
+)
+""",
 ]
 
 UPSERT = """
@@ -179,6 +191,37 @@ def get_isrcs(conn, source, ids):
         conn, "SELECT id, isrc FROM songs WHERE source = ? AND isrc IS NOT NULL AND id IN ({marks})",
         [source], ids)
     return {k: v for k, v in got.items() if v}
+
+
+ORDER_HISTORY_KEEP = 12
+
+
+def record_order(conn, playlist, source, entries):
+    """Append one ordered snapshot ([[track_id, name, artist], ...]) of a
+    provider's playlist — skipped when identical to the newest stored one, and
+    pruned to the last ORDER_HISTORY_KEEP per (playlist, source)."""
+    payload = json.dumps(entries, ensure_ascii=False)
+    last = conn.execute(
+        "SELECT tracks FROM playlist_order WHERE playlist = ? AND source = ? "
+        "ORDER BY captured_at DESC LIMIT 1", (playlist, source)).fetchone()
+    if last and last[0] == payload:
+        return
+    conn.execute("INSERT OR REPLACE INTO playlist_order VALUES (?, ?, ?, ?)",
+                 (playlist, source, _now(), payload))
+    conn.execute(
+        "DELETE FROM playlist_order WHERE playlist = ? AND source = ? AND captured_at NOT IN ("
+        "SELECT captured_at FROM playlist_order WHERE playlist = ? AND source = ? "
+        "ORDER BY captured_at DESC LIMIT ?)",
+        (playlist, source, playlist, source, ORDER_HISTORY_KEEP))
+    conn.commit()
+
+
+def get_order_history(conn, playlist, source):
+    """[(captured_at, [[track_id, name, artist], ...]), ...] newest first."""
+    rows = conn.execute(
+        "SELECT captured_at, tracks FROM playlist_order WHERE playlist = ? AND source = ? "
+        "ORDER BY captured_at DESC", (playlist, source))
+    return [(ts, json.loads(t)) for ts, t in rows.fetchall()]
 
 
 def get_playlist_state(conn, playlist, source):
