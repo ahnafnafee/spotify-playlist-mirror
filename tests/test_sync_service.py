@@ -2,13 +2,13 @@
 
 import asyncio
 
-from omni_sync.services.events import EventBus
-from omni_sync.services.settings import SettingsStore
-from omni_sync.services.syncs import SyncJob, SyncStore
+from songmirror.services.events import EventBus
+from songmirror.services.settings import SettingsStore
+from songmirror.services.syncs import SyncJob, SyncStore
 
 
 def _svc(tmp_path, bus):
-    import omni_sync.services.sync_service as m
+    import songmirror.services.sync_service as m
 
     store = SyncStore(dir=tmp_path)
     job = store.upsert(SyncJob(name="J"))
@@ -19,7 +19,7 @@ def test_run_job_coalesces(monkeypatch, tmp_path):
     calls = []
 
     async def scenario():
-        import omni_sync.services.sync_service as m
+        import songmirror.services.sync_service as m
 
         async def fake_pass(opts, should_continue=None):
             calls.append("start")
@@ -43,7 +43,7 @@ def test_pause_marks_job_resumable(monkeypatch, tmp_path):
     # Pause only affects the running job; the interrupted pass is recorded as
     # "paused" so the card can offer Resume.
     async def scenario():
-        import omni_sync.services.sync_service as m
+        import songmirror.services.sync_service as m
 
         started, release = asyncio.Event(), asyncio.Event()
 
@@ -73,7 +73,7 @@ def test_resume_reruns_a_paused_job(monkeypatch, tmp_path):
     runs = []
 
     async def scenario():
-        import omni_sync.services.sync_service as m
+        import songmirror.services.sync_service as m
 
         async def fake_pass(opts, should_continue=None):
             runs.append(1)
@@ -98,7 +98,7 @@ def test_resume_reruns_a_paused_job(monkeypatch, tmp_path):
 
 def test_run_job_records_failure(monkeypatch, tmp_path):
     async def scenario():
-        import omni_sync.services.sync_service as m
+        import songmirror.services.sync_service as m
 
         async def boom(opts, should_continue=None):
             raise RuntimeError("nope")

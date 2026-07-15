@@ -5,9 +5,9 @@ decides adds vs removes across providers) and the persistence helpers."""
 import os
 import tempfile
 
-from omni_sync.engine import archive
-from omni_sync.engine.matching import spotify_track_keys
-from omni_sync.engine.targets.base import _merge, reconcile
+from songmirror.engine import archive
+from songmirror.engine.matching import spotify_track_keys
+from songmirror.engine.targets.base import _merge, reconcile
 
 
 # --- merge: the safety-critical set logic (per-provider prev + cur) ----------
@@ -340,8 +340,8 @@ def test_unify_uses_every_copys_keys_not_just_the_first():
     # decorated title sits FIRST in playlist order. The junk YT copy matches
     # only the plain second copy's keys; unification must consider every
     # entry's keys, not just the first copy folded into canon.
-    from omni_sync.engine.matching import track_key
-    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+    from songmirror.engine.matching import track_key
+    from songmirror.engine.targets.base import _normalize, _unify_aliases
 
     dec = _normalize({"name": 'Kuch To Hai (From "Do Lafzon Ki Kahani")',
                       "artists": ["Armaan Malik"], "isrc": "I1"}, "spotify")
@@ -357,8 +357,8 @@ def test_unify_uses_every_copys_keys_not_just_the_first():
 def test_unify_folds_ver_abbreviation_into_version():
     # "Twin Ver." vs "Twin Version" — the same release string abbreviated;
     # token-set matching can't bridge ver/version, so loose_name normalizes it.
-    from omni_sync.engine.matching import track_key
-    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+    from songmirror.engine.matching import track_key
+    from songmirror.engine.targets.base import _normalize, _unify_aliases
 
     sp = _normalize({"name": "Cupid - Twin Ver.", "artists": ["FIFTY FIFTY"], "isrc": "K1"}, "spotify")
     ap = _normalize({"name": "Cupid (Twin Version)", "artist": "FIFTY FIFTY"}, "apple")
@@ -371,7 +371,7 @@ def test_unify_never_merges_different_songs():
     # Same title, different artists (a cover on a label channel) must stay two
     # canonical identities — unification is for provider-flavored metadata of
     # ONE song, never for genuinely different recordings by different artists.
-    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+    from songmirror.engine.targets.base import _normalize, _unify_aliases
 
     orig = _normalize({"name": "Another Day in Paradise", "artists": ["Phil Collins"], "isrc": "P1"}, "spotify")
     cover = _normalize({"name": "Another Day in Paradise",
@@ -388,8 +388,8 @@ def test_unify_folds_reordered_and_embellished_artist_credits():
     # "Woodkid, Arcane, League of Legends Music" — same song, reordered AND
     # embellished. The composite key's | separator must not block the match by
     # fusing different neighbor tokens together.
-    from omni_sync.engine.matching import track_key
-    from omni_sync.engine.targets.base import _normalize, _unify_aliases
+    from songmirror.engine.matching import track_key
+    from songmirror.engine.targets.base import _normalize, _unify_aliases
 
     name = "To Ashes and Blood (from the series Arcane League of Legends)"
     sp = _normalize({"name": name, "artist": "Arcane, Woodkid", "isrc": "X1"}, "spotify")

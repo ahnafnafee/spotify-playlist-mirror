@@ -16,8 +16,8 @@ services:
       # LAN-only — do NOT port-forward this to the internet (the UI has no login).
       - "8888:8080"
     environment:
-      OMNI_DATA_DIR: /data           # persistent volume for settings, tokens, caches, syncs, links
-      OMNI_ENV_FILE: /data/app.env   # SettingsStore's managed env; wizard saves win over any .env
+      SONGMIRROR_DATA_DIR: /data           # persistent volume for settings, tokens, caches, syncs, links
+      SONGMIRROR_ENV_FILE: /data/app.env   # SettingsStore's managed env; wizard saves win over any .env
       SPOTIFY_TOKEN_CACHE: /data/spotify_token_cache
       APPLE_CACHE_FILE: /data/apple_resolve_cache.json
       SONG_CACHE_FILE: /data/song_cache.db
@@ -34,12 +34,12 @@ services:
       SPOTIFY_CACHE_FILE: /data/spotify_resolve_cache.json   # N-way Spotify search cache
       SPOTIFY_OAUTH_OPEN_BROWSER: "0"
       # Container-internal download path (the host music dir is bind-mounted to
-      # it below). OMNI_DOWNLOAD_DIR is authoritative over any UI-saved
+      # it below). SONGMIRROR_DOWNLOAD_DIR is authoritative over any UI-saved
       # DOWNLOAD_DIR — that value can be a host path (e.g. F:\Torrent\Music) the
       # container's Linux filesystem doesn't have, which would send spotDL into
       # the ephemeral container instead of the mount. Set the HOST location via
       # DOWNLOAD_DIR in .env (it drives the mount below), not the in-app field.
-      OMNI_DOWNLOAD_DIR: /music
+      SONGMIRROR_DOWNLOAD_DIR: /music
     volumes:
       - ./data:/data
       - "${DOWNLOAD_DIR:-./downloads}:/music"

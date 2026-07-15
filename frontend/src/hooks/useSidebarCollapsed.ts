@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'omni-sidebar-collapsed'
+const STORAGE_KEY = 'songmirror-sidebar-collapsed'
 
 /** Persisted collapse state for the desktop sidebar rail — expanded by
  * default (mirrors useDarkMode's persistence pattern, but with no OS-level

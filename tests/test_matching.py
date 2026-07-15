@@ -3,13 +3,13 @@
 import os
 import tempfile
 
-from omni_sync.engine import archive
-from omni_sync.engine.config import parse_interval
-from omni_sync.engine.matching import (
+from songmirror.engine import archive
+from songmirror.engine.config import parse_interval
+from songmirror.engine.matching import (
     compute_diff, loose_name, normalize_text, protect_removals, romanized,
     score_candidate, track_key,
 )
-from omni_sync.engine.spotify import playlist_item_track
+from songmirror.engine.spotify import playlist_item_track
 
 CID = "catalog"
 

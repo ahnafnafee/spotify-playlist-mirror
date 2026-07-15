@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/omni-favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64" href="/omni-favicon-64.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/omni-favicon-180.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/songmirror-favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/songmirror-favicon-64.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/songmirror-favicon-180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
@@ -16,7 +16,7 @@
       // Dark by default (a stored 'light' choice wins). Runs before React so
       // there's no flash of the light theme on first paint.
       try {
-        if (localStorage.getItem('omni-theme') !== 'light') {
+        if (localStorage.getItem('songmirror-theme') !== 'light') {
           document.documentElement.classList.add('dark')
         }
       } catch (e) {

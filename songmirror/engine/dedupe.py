@@ -13,8 +13,8 @@ re-release vs the original — the residue a mis-resolved search add leaves).
 Removing one of those IS a membership change, so it stays a human decision.
 
 CLI (report by default; inside the container prefix with `docker exec`):
-    uv run python -m omni_sync.engine.dedupe [--playlists a,b] [--variants]
-    uv run python -m omni_sync.engine.dedupe --execute
+    uv run python -m songmirror.engine.dedupe [--playlists a,b] [--variants]
+    uv run python -m songmirror.engine.dedupe --execute
 """
 
 from . import archive
@@ -171,7 +171,7 @@ def _main(argv=None):
     from .targets import build_peers
 
     ap = argparse.ArgumentParser(
-        prog="python -m omni_sync.engine.dedupe",
+        prog="python -m songmirror.engine.dedupe",
         description="Find (and with --execute remove) duplicate playlist copies left by identity splits.")
     ap.add_argument("--execute", action="store_true",
                     help="Remove the duplicate copies (default: report only).")
@@ -181,7 +181,7 @@ def _main(argv=None):
                     help="Also report variant twins — distinct recordings that fuzzy-match as one song.")
     args = ap.parse_args(argv)
 
-    load_dotenv(os.getenv("OMNI_ENV_FILE") or ".env", override=True)
+    load_dotenv(os.getenv("SONGMIRROR_ENV_FILE") or ".env", override=True)
 
     class _Opts:  # just the fields the peer builders read
         providers = os.getenv("PROVIDERS", DEFAULT_PROVIDERS)

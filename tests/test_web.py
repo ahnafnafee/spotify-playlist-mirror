@@ -2,9 +2,9 @@
 
 from fastapi.testclient import TestClient
 
-from omni_sync.services.settings import SettingsStore
-from omni_sync.services.syncs import SyncStore
-from omni_sync.web import create_app
+from songmirror.services.settings import SettingsStore
+from songmirror.services.syncs import SyncStore
+from songmirror.web import create_app
 
 
 def _app(tmp_path):
@@ -40,11 +40,11 @@ def test_settings_falls_back_to_env(tmp_path, monkeypatch):
 
 
 def test_settings_store_uses_data_dir_env(tmp_path, monkeypatch):
-    # In Docker, OMNI_DATA_DIR points at the persistent /data volume — the store
+    # In Docker, SONGMIRROR_DATA_DIR points at the persistent /data volume — the store
     # must write there (not the container-relative ./data default) so wizard
     # config + secrets survive a rebuild.
     vol = tmp_path / "vol"
-    monkeypatch.setenv("OMNI_DATA_DIR", str(vol))
+    monkeypatch.setenv("SONGMIRROR_DATA_DIR", str(vol))
     SettingsStore().save({"SPOTIFY_CLIENT_ID": "cid"})
     assert (vol / "settings.json").exists() and (vol / "app.env").exists()
     assert SettingsStore().get("SPOTIFY_CLIENT_ID") == "cid"  # a fresh store reads it back
@@ -54,8 +54,8 @@ def test_connector_token_paths_follow_env(tmp_path, monkeypatch):
     # In Docker these env vars point at the /data volume; the connectors must honor
     # them so tokens land on the persistent volume (and where the engine reads
     # them), not a relative ./data that's ephemeral inside the container.
-    from omni_sync.services.accounts.spotify import SpotifyConnector
-    from omni_sync.services.accounts.ytmusic import YTMusicConnector
+    from songmirror.services.accounts.spotify import SpotifyConnector
+    from songmirror.services.accounts.ytmusic import YTMusicConnector
 
     monkeypatch.setenv("SPOTIFY_TOKEN_CACHE", str(tmp_path / "sp_token"))
     monkeypatch.setenv("YTMUSIC_AUTH_FILE", str(tmp_path / "yt.json"))
@@ -67,7 +67,7 @@ def test_connector_token_paths_follow_env(tmp_path, monkeypatch):
 def test_apple_ensure_storefront_backfills(monkeypatch, tmp_path):
     # A blank storefront is auto-detected from /v1/me/storefront; an explicit one
     # is left untouched.
-    from omni_sync.services.accounts.apple import AppleConnector
+    from songmirror.services.accounts.apple import AppleConnector
 
     store = SettingsStore(dir=tmp_path)
     store.save({"APPLE_BEARER_TOKEN": "b", "APPLE_USER_TOKEN": "u"})
@@ -79,7 +79,7 @@ def test_apple_ensure_storefront_backfills(monkeypatch, tmp_path):
         def json():
             return {"data": [{"id": "bd", "type": "storefronts"}]}
 
-    monkeypatch.setattr("omni_sync.services.accounts.apple.requests.get", lambda *a, **k: FakeResp())
+    monkeypatch.setattr("songmirror.services.accounts.apple.requests.get", lambda *a, **k: FakeResp())
     AppleConnector(store)._ensure_storefront()
     assert store.get("APPLE_STOREFRONT") == "bd"
 
@@ -129,7 +129,7 @@ def test_oauth_callback_handles_provider_error(tmp_path):
 
 
 def test_sync_run_queues(tmp_path, monkeypatch):
-    import omni_sync.services.sync_service as m
+    import songmirror.services.sync_service as m
 
     async def fake(opts):
         return {"ok": True, "per_target": []}
@@ -159,7 +159,7 @@ def test_events_route_registered(tmp_path):
 
 
 def test_links_crud(tmp_path):
-    from omni_sync.services.playlists import LinkStore
+    from songmirror.services.playlists import LinkStore
 
     app = create_app(settings=SettingsStore(dir=tmp_path), links=LinkStore(dir=tmp_path))
     with TestClient(app) as client:
@@ -188,21 +188,21 @@ def test_syncs_crud(tmp_path):
 
 def test_download_dir_prefers_container_override(tmp_path, monkeypatch):
     # In Docker the download path is a container bind-mount (/music). An
-    # OMNI_DOWNLOAD_DIR override must win over a UI-saved DOWNLOAD_DIR — inside
+    # SONGMIRROR_DOWNLOAD_DIR override must win over a UI-saved DOWNLOAD_DIR — inside
     # the Linux container that value can be a host path (a Windows F:\ path) that
     # spotDL would otherwise write to the ephemeral container filesystem, never
     # reaching the mounted volume. Non-Docker: unset, so the UI value is used.
-    from omni_sync.services.sync_service import SyncService
-    from omni_sync.services.syncs import SyncJob
+    from songmirror.services.sync_service import SyncService
+    from songmirror.services.syncs import SyncJob
 
     store = SettingsStore(dir=tmp_path)
     store.save({"DOWNLOAD_DIR": "F:\\Torrent\\Music"})
     svc = SyncService(store, None, syncs=SyncStore(dir=tmp_path))
     job = SyncJob(name="T", download=True)
 
-    monkeypatch.setenv("OMNI_DOWNLOAD_DIR", "/music")
+    monkeypatch.setenv("SONGMIRROR_DOWNLOAD_DIR", "/music")
     assert svc._opts_for(job, execute=True).download_dir == "/music"
-    monkeypatch.delenv("OMNI_DOWNLOAD_DIR")
+    monkeypatch.delenv("SONGMIRROR_DOWNLOAD_DIR")
     assert svc._opts_for(job, execute=True).download_dir == "F:\\Torrent\\Music"
     job.download = False  # opted out -> no download dir regardless of config
     assert svc._opts_for(job, execute=True).download_dir == ""
@@ -214,8 +214,8 @@ def test_spotify_client_raises_instead_of_prompting(monkeypatch):
     # spotipy's interactive input(), which EOFErrors in a headless server.
     import pytest
 
-    import omni_sync.engine.spotify as sp
-    from omni_sync.engine.targets.base import TargetAuthError
+    import songmirror.engine.spotify as sp
+    from songmirror.engine.targets.base import TargetAuthError
 
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "c")
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "s")
@@ -236,7 +236,7 @@ def test_spotify_client_raises_instead_of_prompting(monkeypatch):
 
 
 def test_transfers_start_and_status(tmp_path, monkeypatch):
-    from omni_sync.services.transfers import TransferService
+    from songmirror.services.transfers import TransferService
 
     # No providers -> the job errors fast (no network); exercises the REAL submit
     # path (asyncio.create_task) so the async-endpoint requirement can't regress.
@@ -253,8 +253,8 @@ def test_transfers_start_and_status(tmp_path, monkeypatch):
 
 
 def test_sse_payload_format():
-    from omni_sync.engine.logs import Event
-    from omni_sync.web.routers.events import _fmt
+    from songmirror.engine.logs import Event
+    from songmirror.web.routers.events import _fmt
 
     line = _fmt(Event(1.0, "add", "apple", "Song - Artist"))
     assert line.startswith("data: ") and line.endswith("\n\n")

@@ -1,7 +1,7 @@
 """build_one registry helper + PlaylistService."""
 
-from omni_sync.engine import targets
-from omni_sync.engine.config import parse_args
+from songmirror.engine import targets
+from songmirror.engine.config import parse_args
 
 
 def test_build_one_unknown_returns_none():
@@ -52,8 +52,8 @@ def test_blank_storefront_defaults(monkeypatch):
 
 
 def test_browse_normalizes_rows(monkeypatch, tmp_path):
-    from omni_sync.services.playlists import PlaylistService
-    from omni_sync.services.settings import SettingsStore
+    from songmirror.services.playlists import PlaylistService
+    from songmirror.services.settings import SettingsStore
 
     class FakeTarget:
         def list_playlists(self):
@@ -65,7 +65,7 @@ def test_browse_normalizes_rows(monkeypatch, tmp_path):
         def playlist_count(self, pl):
             return (pl.get("tracks") or {}).get("total")
 
-    monkeypatch.setattr("omni_sync.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
+    monkeypatch.setattr("songmirror.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("apple")
     assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": "", "owned": True}]
 
@@ -74,12 +74,12 @@ def test_browse_lists_followed_spotify_playlists(monkeypatch, tmp_path):
     # Spotify browse lists followed (non-owned) playlists alongside owned ones, via
     # the un-deduped all_playlists(), and labels each with `owned` so the UI can
     # divide Created from Followed.
-    from omni_sync.services.playlists import PlaylistService
-    from omni_sync.services.settings import SettingsStore
+    from songmirror.services.playlists import PlaylistService
+    from songmirror.services.settings import SettingsStore
 
-    monkeypatch.setattr("omni_sync.services.playlists.spotify.client", lambda *a, **k: object())
+    monkeypatch.setattr("songmirror.services.playlists.spotify.client", lambda *a, **k: object())
     monkeypatch.setattr(
-        "omni_sync.services.playlists.spotify.all_playlists",
+        "songmirror.services.playlists.spotify.all_playlists",
         lambda sp: [{"id": "1", "name": "Mine", "owner": {"id": "me"}, "_owned": True},
                     {"id": "2", "name": "Theirs", "owner": {"id": "other"}, "_owned": False}],
     )
@@ -90,7 +90,7 @@ def test_browse_lists_followed_spotify_playlists(monkeypatch, tmp_path):
 def test_track_total_reads_both_shapes():
     # Spotify's /me/playlists object moved the count from `tracks.total` to
     # `items.total`; read the current key first, fall back to the legacy one.
-    from omni_sync.engine.spotify import track_total
+    from songmirror.engine.spotify import track_total
 
     assert track_total({"items": {"total": 212}}) == 212
     assert track_total({"tracks": {"total": 7}}) == 7
@@ -99,7 +99,7 @@ def test_track_total_reads_both_shapes():
 
 
 def test_pl_image_extraction():
-    from omni_sync.services.playlists import _pl_image
+    from songmirror.services.playlists import _pl_image
 
     assert _pl_image({"images": [{"url": "http://sp/cover.jpg"}]}) == "http://sp/cover.jpg"
     assert _pl_image({"attributes": {"artwork": {"url": "http://ap/{w}x{h}bb.jpg"}}}) == "http://ap/300x300bb.jpg"
@@ -108,7 +108,7 @@ def test_pl_image_extraction():
 
 
 def test_linkstore_roundtrip(tmp_path):
-    from omni_sync.services.playlists import LinkStore, PlaylistLink
+    from songmirror.services.playlists import LinkStore, PlaylistLink
 
     store = LinkStore(dir=tmp_path)
     link = store.upsert(PlaylistLink(name="My Pair", members={"spotify": "s1", "apple": None}))

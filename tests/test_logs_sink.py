@@ -1,6 +1,6 @@
 """The optional logs event sink feeds the live view."""
 
-from omni_sync.engine import logs
+from songmirror.engine import logs
 
 
 def test_sink_receives_typed_events():

@@ -7,7 +7,7 @@ regenerates a managed env file (`app.env`) and updates `os.environ`.
 Why a managed env file: the engine reads `os.getenv(...)` and reloads its env
 each pass via `load_dotenv(..., override=True)`. `override=True` makes the file
 win over the process environment, so a stale hand-edited `.env` would clobber a
-freshly wizard-saved token. Pointing the engine at THIS file (via OMNI_ENV_FILE,
+freshly wizard-saved token. Pointing the engine at THIS file (via SONGMIRROR_ENV_FILE,
 wired in the app factory) makes wizard saves authoritative instead.
 """
 
@@ -36,10 +36,10 @@ def _open_private(path):
 
 class SettingsStore:
     def __init__(self, dir=None):
-        # Default to $OMNI_DATA_DIR (Docker points it at the /data bind mount) so
+        # Default to $SONGMIRROR_DATA_DIR (Docker points it at the /data bind mount) so
         # wizard-saved config + OAuth secrets land on the persistent volume, not
         # the container's ephemeral filesystem. Falls back to a local ./data.
-        self._dir = Path(dir or os.getenv("OMNI_DATA_DIR") or "data")
+        self._dir = Path(dir or os.getenv("SONGMIRROR_DATA_DIR") or "data")
         self._dir.mkdir(parents=True, exist_ok=True)
         try:
             os.chmod(self._dir, 0o700)  # keep the secrets dir owner-only (best-effort; POSIX)

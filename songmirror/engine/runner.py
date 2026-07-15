@@ -162,10 +162,10 @@ def run_pass(opts, should_continue=None):
     # checks it between playlists and halts, keeping what's already applied. Absent
     # (CLI / direct calls) ctrl() is always "run", so behaviour is unchanged.
     ctrl = should_continue or (lambda: "run")
-    # The web app points OMNI_ENV_FILE at SettingsStore's managed file so wizard
+    # The web app points SONGMIRROR_ENV_FILE at SettingsStore's managed file so wizard
     # saves win; the headless CLI falls back to a plain .env. Either way this
     # picks up re-captured tokens without a restart.
-    load_dotenv(os.getenv("OMNI_ENV_FILE") or ".env", override=True)
+    load_dotenv(os.getenv("SONGMIRROR_ENV_FILE") or ".env", override=True)
     # Writable (modify scopes) only for an actual N-way execute — so dry-runs
     # preview without forcing the one-time re-auth a scope change triggers.
     source_provider = opts.sync_source if opts.sync_mode == "oneway" else "spotify"

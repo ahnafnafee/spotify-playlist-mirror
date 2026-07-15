@@ -14,7 +14,7 @@ is provider-agnostic and never changes.
 
 ## The five touchpoints
 
-### 1. Engine target — `omni_sync/engine/targets/<svc>.py`
+### 1. Engine target — `songmirror/engine/targets/<svc>.py`
 
 Subclass `MirrorTarget` (`targets/base.py`). **Required** (no default — must implement):
 
@@ -43,13 +43,13 @@ returns your own playlists (Apple, YouTube Music). `find_playlist()` scans
 Apple bulk-fetches ISRCs), `native_isrc_map()` (expose `{track_id: ISRC}` your resolve
 cache already knows), `expected_ids()`, `is_editable()`.
 
-### 2. Targets registry — `omni_sync/engine/targets/__init__.py`
+### 2. Targets registry — `songmirror/engine/targets/__init__.py`
 
 Two lines: add a builder to `_REGISTRY` (`source -> builder(opts, sp) -> target | None`,
 returning `None` when unconfigured) and the id to `_SOURCE_ORDER`. **Put ISRC-rich
 providers first** — they seed cross-provider identity for the rest.
 
-### 3. Connector (auth) — `omni_sync/services/accounts/<svc>.py`
+### 3. Connector (auth) — `songmirror/services/accounts/<svc>.py`
 
 Subclass `Connector` (`accounts/base.py`). Pick an `auth_kind`
 (`oauth_redirect` | `oauth_device` | `token_paste` | `api_key`), set `config_fields`
@@ -57,7 +57,7 @@ Subclass `Connector` (`accounts/base.py`). Pick an `auth_kind`
 kind (e.g. `begin_redirect`/`complete_redirect` for OAuth, or `submit` for a pasted
 token/key). The engine reads whatever the connector saves to the `SettingsStore`.
 
-### 4. Connectors registry — `omni_sync/services/accounts/__init__.py`
+### 4. Connectors registry — `songmirror/services/accounts/__init__.py`
 
 One line in `CONNECTORS`. The service now appears in the accounts wizard, the
 source/target pickers, and transfers automatically.

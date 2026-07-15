@@ -6,7 +6,7 @@ import types
 from datetime import datetime, timezone
 from pathlib import Path
 
-from omni_sync.engine import downloads as lm
+from songmirror.engine import downloads as lm
 
 
 class FakeSp:
@@ -235,7 +235,7 @@ def test_run_name_collision():
 def test_jellyfin_push_covers():
     import base64
 
-    from omni_sync.engine import jellyfin
+    from songmirror.engine import jellyfin
 
     calls = {"post": []}
 
@@ -269,7 +269,7 @@ def test_jellyfin_push_covers():
 
 
 def test_jellyfin_skips_without_env():
-    from omni_sync.engine import jellyfin
+    from songmirror.engine import jellyfin
 
     for k in ("JELLYFIN_URL", "JELLYFIN_API_KEY"):
         os.environ.pop(k, None)

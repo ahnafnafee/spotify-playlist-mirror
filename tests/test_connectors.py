@@ -1,8 +1,8 @@
 """Account connectors: status + the connect entry point per auth kind."""
 
-from omni_sync.services.accounts import CONNECTORS
-from omni_sync.services.accounts.base import DeviceCode
-from omni_sync.services.settings import SettingsStore
+from songmirror.services.accounts import CONNECTORS
+from songmirror.services.accounts.base import DeviceCode
+from songmirror.services.settings import SettingsStore
 
 
 def _conn(cid, tmp_path):

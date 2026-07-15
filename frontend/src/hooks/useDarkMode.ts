@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'omni-theme'
+const STORAGE_KEY = 'songmirror-theme'
 
 function getInitialDark(): boolean {
   // Dark by default, irrespective of the OS preference; a stored 'light' wins.

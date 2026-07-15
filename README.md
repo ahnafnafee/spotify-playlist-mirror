@@ -28,9 +28,9 @@ A free, open-source, **self-hosted alternative to Soundiiz, TuneMyMusic, and Fre
 
 <sup>Set it up once — every playlist you curate stays mirrored across every service, in date-added order.</sup>
 
-<a href="./.github/assets/omni-sync-demo.mp4"><img src="./.github/assets/omni-sync-demo.gif" alt="SongMirror demo — logo reveal, dashboard, one-way and bidirectional sync setup, live playlist transfers, and ISRC-accurate matching across Spotify, Apple Music, and YouTube Music" width="88%"></a>
+<a href="./.github/assets/songmirror-demo.mp4"><img src="./.github/assets/songmirror-demo.gif" alt="SongMirror demo — logo reveal, dashboard, one-way and bidirectional sync setup, live playlist transfers, and ISRC-accurate matching across Spotify, Apple Music, and YouTube Music" width="88%"></a>
 
-<sup>▶ <a href="./.github/assets/omni-sync-demo.mp4">Watch the 1080p version</a></sup>
+<sup>▶ <a href="./.github/assets/songmirror-demo.mp4">Watch the 1080p version</a></sup>
 
 </div>
 
@@ -135,7 +135,7 @@ Prefer running it without Docker?
 
 ```bash
 uv sync
-uv run uvicorn omni_sync.web:app --host 0.0.0.0 --port 8080   # then open http://127.0.0.1:8080
+uv run uvicorn songmirror.web:app --host 0.0.0.0 --port 8080   # then open http://127.0.0.1:8080
 ```
 
 > Requires [`uv`](https://docs.astral.sh/uv/) (Python 3.13+). For the local download mirror, also `uv tool install spotdl` and have `ffmpeg` on PATH.
@@ -347,10 +347,10 @@ sqlite3 song_cache.db "SELECT name, artist, album, first_seen FROM songs ORDER B
 
 ## 🧱 Project layout
 
-CLI entry: `uv run main.py` (thin shim) or `python -m omni_sync`. Web entry: `omni_sync.web:app`.
+CLI entry: `uv run main.py` (thin shim) or `python -m songmirror`. Web entry: `songmirror.web:app`.
 
 ```text
-omni_sync/
+songmirror/
   engine/       # provider-agnostic sync core (no web deps): runner, matching, targets/, spotify, downloads, archive
   services/     # stateful services over the engine: accounts/ connectors, syncs, sync_service, transfers, playlists, settings
   web/          # FastAPI app: thin HTTP/SSE over services/ (routers/)

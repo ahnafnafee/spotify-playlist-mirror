@@ -2,10 +2,10 @@
 
 import asyncio
 
-from omni_sync.services.events import EventBus
-from omni_sync.services.settings import SettingsStore
-from omni_sync.services.sync_service import SyncService
-from omni_sync.services.transfers import TransferService, transfer
+from songmirror.services.events import EventBus
+from songmirror.services.settings import SettingsStore
+from songmirror.services.sync_service import SyncService
+from songmirror.services.transfers import TransferService, transfer
 
 
 class _Src:
@@ -151,7 +151,7 @@ def test_run_exclusive_queues_behind_sync(monkeypatch, tmp_path):
     order = []
 
     async def scenario():
-        import omni_sync.services.sync_service as m
+        import songmirror.services.sync_service as m
 
         async def fake_pass(opts, should_continue=None):
             order.append("sync-start")
@@ -162,7 +162,7 @@ def test_run_exclusive_queues_behind_sync(monkeypatch, tmp_path):
         monkeypatch.setattr(m, "_run_pass_async", fake_pass)
         bus = EventBus()
         bus.bind_loop(asyncio.get_running_loop())
-        from omni_sync.services.syncs import SyncJob, SyncStore
+        from songmirror.services.syncs import SyncJob, SyncStore
 
         store = SyncStore(dir=tmp_path)
         job = store.upsert(SyncJob(name="J"))
@@ -247,7 +247,7 @@ def test_transfer_service_reports_conflicts(monkeypatch, tmp_path):
 
 
 def test_transfer_service_resolve_writes_cache(monkeypatch, tmp_path):
-    from omni_sync.engine.runner import load_cache
+    from songmirror.engine.runner import load_cache
 
     out = {}
 

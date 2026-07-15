@@ -14,7 +14,7 @@ import {
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 
-import omniMark from '@/assets/brand/omni-mark.png'
+import songmirrorMark from '@/assets/brand/songmirror-mark.png'
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed'
 import { cn } from '@/lib/cn'
 
@@ -178,5 +178,5 @@ export function Sidebar() {
 function Logo() {
   // Orange mark on a transparent background — theme-agnostic, no light/dark
   // swap needed.
-  return <img src={omniMark} alt="" className="size-7 shrink-0" />
+  return <img src={songmirrorMark} alt="" className="size-7 shrink-0" />
 }

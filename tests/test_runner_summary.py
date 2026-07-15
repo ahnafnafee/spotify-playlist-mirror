@@ -1,7 +1,7 @@
 """run_pass returns a per-pass summary dict (consumed by the web layer)."""
 
-import omni_sync.engine.runner as runner
-from omni_sync.engine.config import Options
+import songmirror.engine.runner as runner
+from songmirror.engine.config import Options
 
 
 def _opts(**kw):
@@ -57,8 +57,8 @@ def test_nway_wraps_accumulated_summary(monkeypatch):
 
 
 def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
-    from omni_sync.engine import archive
-    from omni_sync.services.playlists import PlaylistLink
+    from songmirror.engine import archive
+    from songmirror.services.playlists import PlaylistLink
 
     songs = archive.connect(str(tmp_path / "s.db"))
 
@@ -108,8 +108,8 @@ def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
 def test_run_target_stops_between_playlists_on_control(tmp_path):
     # The Stop/Pause hook: run_target checks should_continue at each playlist
     # boundary and halts, leaving the rest for a re-run.
-    from omni_sync.engine import archive
-    from omni_sync.engine.runner import run_target
+    from songmirror.engine import archive
+    from songmirror.engine.runner import run_target
 
     songs = archive.connect(str(tmp_path / "s.db"))
     names = []
@@ -146,8 +146,8 @@ def test_mirror_pair_non_spotify_source_never_writes_links(tmp_path):
     # Safety: the archive `links` table is Spotify-anchored and load-bearing for
     # N-way identity, so a non-Spotify one-way source must never write to it —
     # it falls back to track-key matching instead.
-    from omni_sync.engine import archive
-    from omni_sync.engine.targets.base import mirror_pair
+    from songmirror.engine import archive
+    from songmirror.engine.targets.base import mirror_pair
 
     songs = archive.connect(str(tmp_path / "s.db"))
 

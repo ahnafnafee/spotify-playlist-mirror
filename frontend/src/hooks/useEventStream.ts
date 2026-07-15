@@ -12,7 +12,7 @@ const PASS_STARTED_RE = /pass started/i
 // persisted storage stays small regardless of how long a live session runs.
 // "v1" so a future change to SyncEvent's shape can invalidate old entries by
 // bumping the key rather than needing a migration.
-const STORAGE_KEY = 'omni-live-feed-v1'
+const STORAGE_KEY = 'songmirror-live-feed-v1'
 const PERSIST_MAX_EVENTS = 200
 
 export interface EventCounters {

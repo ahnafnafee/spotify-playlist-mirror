@@ -47,7 +47,7 @@ def create_app(settings=None, bus=None, sync_service=None, links=None, transfers
         # the settings API shows the actual running defaults; the managed env
         # file + settings.json then take precedence.
         load_dotenv()
-        os.environ["OMNI_ENV_FILE"] = settings.env_path
+        os.environ["SONGMIRROR_ENV_FILE"] = settings.env_path
         settings.apply_to_env()
         await sync_service.start()
         try:

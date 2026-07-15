@@ -3,8 +3,8 @@
 import asyncio
 import threading
 
-from omni_sync.services.events import EventBus
-from omni_sync.engine.logs import Event
+from songmirror.services.events import EventBus
+from songmirror.engine.logs import Event
 
 
 def test_publish_from_worker_thread_reaches_subscriber():

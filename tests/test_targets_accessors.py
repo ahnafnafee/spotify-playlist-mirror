@@ -1,8 +1,8 @@
 """Provider playlist accessors (name/id) resolve each service's dict shape."""
 
-from omni_sync.engine.targets.apple import AppleMusicTarget
-from omni_sync.engine.targets.base import MirrorTarget
-from omni_sync.engine.targets.ytmusic import YTMusicTarget
+from songmirror.engine.targets.apple import AppleMusicTarget
+from songmirror.engine.targets.base import MirrorTarget
+from songmirror.engine.targets.ytmusic import YTMusicTarget
 
 
 def test_playlist_name_per_provider_shape():
@@ -29,9 +29,9 @@ def test_find_playlist_default_and_spotify_override(monkeypatch):
 
     # ...but Spotify scans the un-deduped all_playlists, so a followed playlist
     # sharing a name with an owned one is still reachable by id.
-    from omni_sync.engine.targets.spotify_target import SpotifyTarget
+    from songmirror.engine.targets.spotify_target import SpotifyTarget
 
-    monkeypatch.setattr("omni_sync.engine.spotify.all_playlists",
+    monkeypatch.setattr("songmirror.engine.spotify.all_playlists",
                         lambda sp: [{"id": "own", "name": "Dup", "_owned": True},
                                     {"id": "flw", "name": "Dup", "_owned": False}])
     target = SpotifyTarget(object(), "cache.json")
@@ -49,7 +49,7 @@ def test_ytmusic_browser_backend_maps_shapes_and_is_selected(monkeypatch, tmp_pa
     # The opted-in no-quota browser backend is selected by build(), and maps
     # ytmusicapi's youtubei shapes to the engine's dicts (setVideoId for removal,
     # artists joined, duration in ms; id-less rows dropped).
-    import omni_sync.engine.targets.ytmusic as yt
+    import songmirror.engine.targets.ytmusic as yt
 
     class FakeYTM:
         def __init__(self, *a, **k):
@@ -89,7 +89,7 @@ def test_apple_playlist_count_uses_meta_total_and_caches():
     # Apple library playlists carry no trackCount, so the count comes from the
     # tracks endpoint's meta.total, cached against lastModifiedDate (one call per
     # playlist, re-fetched only when the playlist changes).
-    from omni_sync.engine.targets import apple
+    from songmirror.engine.targets import apple
 
     apple._COUNT_CACHE.clear()
     target = apple.AppleMusicTarget.__new__(apple.AppleMusicTarget)
@@ -110,7 +110,7 @@ def test_apple_playlist_count_uses_meta_total_and_caches():
 def test_jellyfin_list_playlists_fills_counts(monkeypatch):
     # ChildCount isn't populated for playlists in the list query, so counts are
     # a concurrent per-playlist TotalRecordCount lookup.
-    from omni_sync.engine import jellyfin
+    from songmirror.engine import jellyfin
 
     monkeypatch.setenv("JELLYFIN_URL", "http://jf")
     monkeypatch.setenv("JELLYFIN_API_KEY", "k")

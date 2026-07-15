@@ -1,4 +1,4 @@
-// Mocked visual/behavioral verification pass for the Omni Sync SPA.
+// Mocked visual/behavioral verification pass for the SongMirror SPA.
 // Serves the production build (vite preview) and drives it with Playwright,
 // intercepting every /api and /events call so the backend is never needed.
 //
@@ -493,7 +493,7 @@ async function main() {
     for (const theme of themes) {
       const context = await browser.newContext()
       await context.addInitScript((t) => {
-        window.localStorage.setItem('omni-theme', t)
+        window.localStorage.setItem('songmirror-theme', t)
       }, theme)
       const page = await context.newPage()
       await installMocks(page)
@@ -552,7 +552,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
@@ -575,7 +575,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
 
@@ -591,7 +591,7 @@ async function main() {
       await page.waitForTimeout(250) // width transition
       await checkOverflow(page, 'Sidebar collapsed @ 1280', results)
       await shot(page, 'sidebar-collapsed-1280')
-      const storedAfterCollapse = await page.evaluate(() => window.localStorage.getItem('omni-sidebar-collapsed'))
+      const storedAfterCollapse = await page.evaluate(() => window.localStorage.getItem('songmirror-sidebar-collapsed'))
       console.log(`${storedAfterCollapse === 'true' ? 'ok        ' : 'FAIL      '} localStorage persisted collapsed=true (got ${storedAfterCollapse})`)
       if (storedAfterCollapse !== 'true') results.push({ label: 'sidebar collapse persistence', overflow: true })
 
@@ -631,7 +631,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page, {
         transfers: [
@@ -784,7 +784,7 @@ async function main() {
     // -----------------------------------------------------------------
     for (const width of [375, 1280]) {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.setViewportSize({ width, height: 900 })
@@ -1165,7 +1165,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
 
@@ -1262,7 +1262,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       // Shared ACCOUNTS fixture has Jellyfin unconfigured; this block
@@ -1350,7 +1350,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.setViewportSize({ width: 1280, height: 900 })
@@ -1431,7 +1431,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
 
@@ -1552,7 +1552,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       // Override just this endpoint so every account reads unconfigured;
@@ -1588,7 +1588,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       const playlistRequests = []
@@ -1648,7 +1648,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.setViewportSize({ width: 1280, height: 900 })
@@ -1730,7 +1730,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       // 20 playlists - long enough to need the picker's own internal
@@ -1828,7 +1828,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       let eventsConnectionCount = 0
@@ -1951,7 +1951,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       let eventsConnectionCount = 0
@@ -1993,7 +1993,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.setViewportSize({ width: 1280, height: 900 })
@@ -2045,7 +2045,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       // Spotify starts unconfigured here (overriding the shared fixture's
@@ -2099,7 +2099,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.route('**/api/transfers/*', async (route) => {
@@ -2147,7 +2147,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.route('**/api/playlists*', async (route) => {
@@ -2226,7 +2226,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page, {
         transfers: [
@@ -2285,7 +2285,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       // Jellyfin connected (still not transferable) - the exclusion only
@@ -2352,7 +2352,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.route('**/events', async (route) => {
@@ -2417,7 +2417,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.setViewportSize({ width: 1280, height: 900 })
@@ -2467,7 +2467,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.route('**/api/sync/status', async (route) => {
@@ -2515,7 +2515,7 @@ async function main() {
     // -----------------------------------------------------------------
     {
       const context = await browser.newContext()
-      await context.addInitScript(() => window.localStorage.setItem('omni-theme', 'light'))
+      await context.addInitScript(() => window.localStorage.setItem('songmirror-theme', 'light'))
       const page = await context.newPage()
       await installMocks(page)
       await page.route('**/events', async (route) => {
@@ -2533,7 +2533,7 @@ async function main() {
       await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
       await page.waitForSelector('text=Added "Track 249"') // last of 250 has landed
 
-      const stored = await page.evaluate(() => window.localStorage.getItem('omni-live-feed-v1'))
+      const stored = await page.evaluate(() => window.localStorage.getItem('songmirror-live-feed-v1'))
       let storedArr = null
       try {
         storedArr = JSON.parse(stored)
@@ -2554,9 +2554,9 @@ async function main() {
     {
       const context = await browser.newContext()
       await context.addInitScript(() => {
-        window.localStorage.setItem('omni-theme', 'light')
+        window.localStorage.setItem('songmirror-theme', 'light')
         window.localStorage.setItem(
-          'omni-live-feed-v1',
+          'songmirror-live-feed-v1',
           JSON.stringify([{ ts: 1700000000, kind: 'add', tag: 'spotify', message: 'Added "Hydrated Track" by Someone' }]),
         )
       })
@@ -2581,8 +2581,8 @@ async function main() {
     {
       const context = await browser.newContext()
       await context.addInitScript(() => {
-        window.localStorage.setItem('omni-theme', 'light')
-        window.localStorage.setItem('omni-live-feed-v1', 'not valid json{')
+        window.localStorage.setItem('songmirror-theme', 'light')
+        window.localStorage.setItem('songmirror-live-feed-v1', 'not valid json{')
       })
       const page = await context.newPage()
       await installMocks(page)
@@ -2601,7 +2601,7 @@ async function main() {
       console.log(`${noCrash ? 'ok        ' : 'FAIL      '} malformed persisted feed JSON does not crash render (errors: ${pageErrors.join('; ')})`)
       if (!noCrash) results.push({ label: 'live feed malformed json crash', overflow: true })
 
-      const clearedAfterLoad = await page.evaluate(() => window.localStorage.getItem('omni-live-feed-v1'))
+      const clearedAfterLoad = await page.evaluate(() => window.localStorage.getItem('songmirror-live-feed-v1'))
       const clearedOk = clearedAfterLoad === null
       console.log(`${clearedOk ? 'ok        ' : 'FAIL      '} malformed persisted feed JSON is cleared after a failed parse (got ${JSON.stringify(clearedAfterLoad)})`)
       if (!clearedOk) results.push({ label: 'live feed malformed json cleanup', overflow: true })

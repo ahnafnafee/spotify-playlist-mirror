@@ -6,7 +6,7 @@ import stat
 import pytest
 from dotenv import load_dotenv
 
-from omni_sync.services.settings import SettingsStore
+from songmirror.services.settings import SettingsStore
 
 
 def test_saved_credential_survives_dotenv_reload(tmp_path, monkeypatch):

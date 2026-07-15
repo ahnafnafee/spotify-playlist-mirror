@@ -1,8 +1,8 @@
 """The duplicate-copy cleanup: flag only extra copies of one identity, keep
 membership intact, clear the baseline on apply so nothing propagates."""
 
-from omni_sync.engine import archive, dedupe
-from omni_sync.engine.targets.base import MirrorTarget, _normalize
+from songmirror.engine import archive, dedupe
+from songmirror.engine.targets.base import MirrorTarget, _normalize
 
 
 class _Peer(MirrorTarget):
@@ -105,7 +105,7 @@ def test_apple_remove_occurrences_reappends_shared_id_keeper(monkeypatch):
     # Apple's tracks-DELETE takes every copy of a library song with it. When
     # the keeper shares the flagged copy's id it must be re-appended; a group
     # whose copies are all flagged must not be.
-    from omni_sync.engine.targets.apple import AppleMusicTarget
+    from songmirror.engine.targets.apple import AppleMusicTarget
 
     ap = AppleMusicTarget.__new__(AppleMusicTarget)  # no tokens needed for this path
     tracks = [
