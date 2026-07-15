@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useLayoutEffect, useState } from 'react'
 import { LuArrowLeft, LuArrowRight, LuCheck, LuInfo } from 'react-icons/lu'
 
 import { api, errorMessage } from '@/api'
@@ -251,8 +251,10 @@ export function SyncWizard({ open, onClose, job, accounts, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Fresh state every time the wizard (re)opens, so a previous attempt (or a
-  // different job) never leaks into a new session.
-  useEffect(() => {
+  // different job) never leaks into a new session. Layout effect: it must
+  // apply BEFORE paint, or editing an N-way job flashes one frame of the
+  // one-way defaults (Source-of-truth picker included).
+  useLayoutEffect(() => {
     if (!open) return
     setForm(formFromJob(job))
     setStep(0)
