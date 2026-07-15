@@ -39,6 +39,10 @@ def transfer(source, dest, src_pl, dest_pl, cache, *, execute, max_adds, on_prog
     total = len(src)
     if on_progress:
         on_progress(0, total, 0)  # publish the total once source is read, before matching begins
+    # Same-provider copy (e.g. a followed Spotify list into a new owned one): the
+    # track's own id is already valid on the destination, so use it directly instead
+    # of re-searching for it (which resolve() does for the cross-provider case).
+    same_provider = source.source == dest.source
     additions, not_found = [], []
     completed = True
     for i, norm in enumerate(sorted(src, key=lambda n: n["added_at"]), 1):
@@ -47,12 +51,15 @@ def transfer(source, dest, src_pl, dest_pl, cache, *, execute, max_adds, on_prog
             break
         keys = spotify_track_keys(norm)
         if not keys & seen:  # skip tracks already on the destination
-            try:
-                tid, _ = dest.resolve(norm, cache)
-            except TargetAuthError:
-                raise
-            except Exception:
-                tid = None
+            if same_provider:
+                tid = source.track_id(norm["_raw"])
+            else:
+                try:
+                    tid, _ = dest.resolve(norm, cache)
+                except TargetAuthError:
+                    raise
+                except Exception:
+                    tid = None
             if tid:
                 additions.append(tid)
                 seen |= keys
@@ -246,10 +253,10 @@ class TransferService:
         return build_one(provider_id, opts, sp)
 
     def _find(self, provider, playlist_id):
-        for pl in provider.list_playlists().values():
-            if provider.playlist_id(pl) == playlist_id:
-                return pl
-        return None
+        # find_playlist scans the provider's full set — for Spotify that's the
+        # un-deduped list, so a followed playlist is reachable by id even when a
+        # same-named owned one exists (list_playlists() would have hidden it).
+        return provider.find_playlist(playlist_id)
 
     def _dest_playlist(self, dst, src, src_pl, spec):
         if spec.get("dest_playlist_id"):

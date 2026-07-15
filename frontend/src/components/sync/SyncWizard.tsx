@@ -5,6 +5,7 @@ import { api, errorMessage } from '@/api'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { RadioCard } from '@/components/ui/RadioCard'
+import { SelectField } from '@/components/ui/SelectField'
 import { ServiceLogo } from '@/components/ui/ServiceLogo'
 import { SettingsGroup } from '@/components/ui/SettingsGroup'
 import { TextField } from '@/components/ui/TextField'
@@ -30,6 +31,7 @@ interface JobFormState {
   interval: string
   max_adds: string
   max_removals: string
+  apply_large_removals: boolean
   download: boolean
 }
 
@@ -43,6 +45,7 @@ const NEW_JOB_DEFAULTS: JobFormState = {
   interval: '15m',
   max_adds: '200',
   max_removals: '25',
+  apply_large_removals: false,
   download: false,
 }
 
@@ -58,9 +61,21 @@ function formFromJob(job: SyncJob | null): JobFormState {
     interval: job.interval,
     max_adds: String(job.max_adds),
     max_removals: String(job.max_removals),
+    apply_large_removals: job.apply_large_removals,
     download: job.download,
   }
 }
+
+const INTERVAL_PRESETS: Array<{ value: string; label: string }> = [
+  { value: '15m', label: 'Every 15 minutes' },
+  { value: '30m', label: 'Every 30 minutes' },
+  { value: '1h', label: 'Every hour' },
+  { value: '2h', label: 'Every 2 hours' },
+  { value: '3h', label: 'Every 3 hours' },
+  { value: '6h', label: 'Every 6 hours' },
+  { value: '12h', label: 'Every 12 hours' },
+  { value: '24h', label: 'Once a day' },
+]
 
 // The wizard's five steps, in order. `intro` is the one friendly sentence
 // shown above each step's fields; `label` is what the stepper shows.
@@ -310,6 +325,7 @@ export function SyncWizard({ open, onClose, job, accounts, onSaved }: Props) {
     interval: form.interval,
     max_adds: Number(form.max_adds) || 0,
     max_removals: Number(form.max_removals) || 0,
+    apply_large_removals: form.apply_large_removals,
     download: form.download,
   }
   const summaryRows = buildSyncSummaryRows(previewJob, syncPeers, settings?.DOWNLOAD_DIR)
@@ -329,6 +345,7 @@ export function SyncWizard({ open, onClose, job, accounts, onSaved }: Props) {
         interval: form.interval,
         max_adds: Number(form.max_adds),
         max_removals: Number(form.max_removals),
+        apply_large_removals: form.apply_large_removals,
         download: form.download,
       }
       if (job) await api.updateSync(job.id, values)
@@ -468,12 +485,16 @@ export function SyncWizard({ open, onClose, job, accounts, onSaved }: Props) {
                     : 'Paused, skipped by its schedule and by "Run all enabled". You can still sync it manually.'
                 }
               />
-              <TextField
+              <SelectField
                 label="Interval"
-                help="How often this sync runs automatically, e.g. 15m, 1h, 900."
+                help="How often this sync runs automatically."
                 value={form.interval}
                 onChange={(e) => setField('interval', e.target.value)}
-                error={!intervalValid ? 'Use a number optionally followed by s, m, or h, e.g. 15m.' : undefined}
+                options={
+                  INTERVAL_PRESETS.some((o) => o.value === form.interval)
+                    ? INTERVAL_PRESETS
+                    : [{ value: form.interval, label: form.interval || '(unset)' }, ...INTERVAL_PRESETS]
+                }
               />
             </>
           )}
@@ -509,6 +530,12 @@ export function SyncWizard({ open, onClose, job, accounts, onSaved }: Props) {
                     instead of writing it. You'll see held rows in the feed and can review before anything is lost.
                   </p>
                 </div>
+                <Toggle
+                  checked={form.apply_large_removals}
+                  onChange={(v) => setField('apply_large_removals', v)}
+                  label="Apply large removals"
+                  description="Off (default): removals beyond the cap are held back for safety. On: they're deleted in capped batches over successive passes until cleared."
+                />
               </div>
 
               <div className="border-t border-border pt-3.5">

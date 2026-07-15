@@ -50,6 +50,12 @@ class SpotifyTarget(MirrorTarget):
     def list_playlists(self):
         return spotify.playlists_by_name(self._sp)
 
+    def browse_playlists(self):
+        # Un-deduped, with `_owned` — so browse lists (and the inherited find_playlist
+        # scans) every playlist, including a followed one that shares a name with an
+        # owned one. list_playlists() name-dedupes for the sync engine and would hide it.
+        return spotify.all_playlists(self._sp)
+
     def is_editable(self, playlist):
         owner = (playlist.get("owner") or {}).get("id")
         return owner is None or owner == self._user()

@@ -49,19 +49,9 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
   // Only sync/transfer peers can be an endpoint — browse-only services like
   // Jellyfin (a local mirror the download step feeds) are filtered out.
   const transferable = useMemo(() => accounts.filter((a) => a.transferable), [accounts])
-  const destProviderOptions = useMemo(
-    () => transferable.filter((a) => a.id !== sourceProvider),
-    [transferable, sourceProvider],
-  )
-
-  // A source change invalidates a same-provider destination selection —
-  // clear it rather than let a stale, now-hidden option linger.
-  useEffect(() => {
-    if (destProvider && destProvider === sourceProvider) {
-      setDestProvider('')
-      setDestPlaylistId('')
-    }
-  }, [sourceProvider, destProvider])
+  // Same-provider transfers are allowed (e.g. copy a followed Spotify list into a
+  // new owned Spotify playlist), so the destination service list isn't filtered.
+  const destProviderOptions = transferable
 
   // Default "create new"'s name to the source playlist's name — re-derives
   // whenever the source playlist or the create-new choice changes, but a
@@ -75,9 +65,20 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
   const sourcePlaylist = entries[sourceProvider]?.playlists.find((p) => p.id === sourcePlaylistId)
   const destPlaylist = destMode === 'existing' ? entries[destProvider]?.playlists.find((p) => p.id === destPlaylistId) : undefined
 
-  const formValid = Boolean(
-    sourceProvider && sourcePlaylistId && destProvider && (destMode === 'create' ? destName.trim() : destPlaylistId),
-  )
+  // A transfer writes tracks, so an existing destination must be a playlist you
+  // OWN — followed (read-only) playlists are excluded from the destination picker.
+  const destPlaylists = (entries[destProvider]?.playlists ?? []).filter((p) => p.owned !== false)
+
+  // Copying a playlist into itself is a no-op — block only the exact same-provider,
+  // same-id case; same-provider "Create new" (or a different existing list) is fine.
+  const sameTarget =
+    sourceProvider === destProvider &&
+    destMode === 'existing' &&
+    Boolean(destPlaylistId) &&
+    destPlaylistId === sourcePlaylistId
+  const formValid =
+    Boolean(sourceProvider && sourcePlaylistId && destProvider && (destMode === 'create' ? destName.trim() : destPlaylistId)) &&
+    !sameTarget
 
   async function handleStart() {
     setStarting(true)
@@ -214,7 +215,7 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
                   <PlaylistPickerField
                     label="Existing playlist"
                     placeholder={destProvider ? 'Choose a playlist…' : 'Choose a destination service first'}
-                    playlists={entries[destProvider]?.playlists ?? []}
+                    playlists={destPlaylists}
                     loading={entries[destProvider]?.loading}
                     value={destPlaylistId}
                     disabled={!destProvider}
@@ -243,6 +244,11 @@ export function TransferSetupForm({ accounts, entries, onStarted }: Props) {
           </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
+          {sameTarget && (
+            <p className="text-sm text-text-3">
+              That's the same playlist as the source. Pick a different destination, or choose "Create new".
+            </p>
+          )}
 
           <div>
             <Button onClick={() => setConfirming(true)} disabled={!formValid}>

@@ -47,7 +47,7 @@ def save_cache(cache_file, cache):
         json.dump({"isrc": cache["isrc"], "search": cache["search"]}, f, indent=1)
 
 
-_SUMMARY_KEYS = ("added", "removed", "missing", "held", "deferred", "created", "skipped")
+_SUMMARY_KEYS = ("added", "removed", "missing", "held", "deferred", "removals_skipped", "created", "skipped")
 
 
 def _summary_entry(name, agg):
@@ -88,7 +88,7 @@ def run_target(target, selected, get_source_tracks, songs, opts, links=None, sou
     path (empty `links` => byte-for-byte unchanged when the source is Spotify)."""
     src_key = source.source
     agg = {"name": target.name, "pairs": 0, "added": 0, "removed": 0,
-           "missing": 0, "held": 0, "skipped": 0, "created": 0}
+           "missing": 0, "held": 0, "removals_skipped": 0, "skipped": 0, "created": 0}
     cache = load_cache(target.cache_file)
     try:
         tgt_by_name = target.list_playlists()
@@ -136,10 +136,11 @@ def run_target(target, selected, get_source_tracks, songs, opts, links=None, sou
                 res = mirror_pair(
                     target, get_source_tracks(sp_playlist), sp_playlist, tgt, cache, songs,
                     execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds,
+                    drain_removals=opts.apply_large_removals,
                     source_key=src_key, source_name=source.name, name=name,
                 )
                 agg["pairs"] += 1
-                for k in ("added", "removed", "missing", "held"):
+                for k in ("added", "removed", "missing", "held", "removals_skipped"):
                     agg[k] += res[k]
                 if res["clean"] and snapshot:
                     archive.set_state(songs, state_key, target.source, snapshot, res["target_count"])
@@ -339,7 +340,7 @@ def _run_nway(opts, sp, selected, songs):
 
     dirs = {p.source: p.list_playlists() for p in peers}
     caches = {p.source: load_cache(p.cache_file) for p in peers}
-    total = {"added": 0, "removed": 0, "missing": 0, "held": 0, "deferred": 0}
+    total = {"added": 0, "removed": 0, "missing": 0, "held": 0, "deferred": 0, "removals_skipped": 0}
     try:
         for sp_playlist in selected:
             name = sp_playlist["name"]
@@ -370,7 +371,8 @@ def _run_nway(opts, sp, selected, songs):
                 continue
             try:
                 stats = reconcile(active, name, playlists, caches, songs,
-                                  execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds)
+                                  execute=opts.execute, max_removals=opts.max_removals, max_adds=opts.max_adds,
+                                  drain_removals=opts.apply_large_removals)
                 for k in total:
                     total[k] += stats.get(k, 0)
             except TargetAuthError:

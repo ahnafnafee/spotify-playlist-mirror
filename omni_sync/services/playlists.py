@@ -50,32 +50,31 @@ class PlaylistService:
         self._settings = settings
 
     def browse(self, provider_id):
-        """[{id, name, count}] for one connected provider (empty if unconfigured)."""
+        """[{id, name, count, image, owned}] for one connected provider (empty if
+        unconfigured). Provider-agnostic: every service is listed through its
+        MirrorTarget.browse_playlists() + accessors, so adding a provider needs no
+        change here. `owned` is False only for a followed (non-owned) playlist — a
+        provider surfaces those by overriding browse_playlists (Spotify does today).
+        Jellyfin is browse-only and lists via its own API."""
         self._settings.apply_to_env()
         if provider_id == "jellyfin":
-            # Jellyfin is browse-only (cover-push destination, not a sync target),
-            # so it lists via its own API rather than the targets registry.
             from ..engine import jellyfin
-            return sorted(jellyfin.list_playlists(), key=lambda r: (r["name"] or "").casefold())
+            rows = [{**r, "owned": True} for r in jellyfin.list_playlists()]
+            return sorted(rows, key=lambda r: (r["name"] or "").casefold())
         opts = parse_args([])
-        sp = None
-        if provider_id == "spotify":
-            try:
-                sp = spotify.client()
-            except Exception:
-                return []
-        target = build_one(provider_id, opts, sp)
+        try:
+            sp = spotify.client() if provider_id == "spotify" else None  # only the Spotify target needs a client
+            target = build_one(provider_id, opts, sp)
+        except Exception:
+            return []  # e.g. Spotify not authorized yet -> nothing to browse
         if target is None:
             return []
         try:
-            by_name = target.list_playlists()
+            playlists = target.browse_playlists()
         except Exception:
             return []
-        rows = [
-            {"id": _pl_id(pl), "name": _pl_name(pl), "count": target.playlist_count(pl),
-             "image": _pl_image(pl)}
-            for pl in by_name.values()
-        ]
+        rows = [{"id": _pl_id(pl), "name": _pl_name(pl), "count": target.playlist_count(pl),
+                 "image": _pl_image(pl), "owned": bool(pl.get("_owned", True))} for pl in playlists]
         return sorted(rows, key=lambda r: (r["name"] or "").casefold())
 
 

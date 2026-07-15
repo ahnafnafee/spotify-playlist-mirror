@@ -17,6 +17,27 @@ def test_playlist_id_per_provider_shape():
     assert YTMusicTarget.playlist_id(None, {"playlistId": "y1"}) == "y1"  # youtube
 
 
+def test_find_playlist_default_and_spotify_override(monkeypatch):
+    # Default scans the name-keyed list_playlists()...
+    class T(MirrorTarget):
+        def list_playlists(self):
+            return {"a": {"id": "1", "name": "A"}, "b": {"id": "2", "name": "B"}}
+
+    t = T()
+    assert t.find_playlist("2") == {"id": "2", "name": "B"}
+    assert t.find_playlist("9") is None
+
+    # ...but Spotify scans the un-deduped all_playlists, so a followed playlist
+    # sharing a name with an owned one is still reachable by id.
+    from omni_sync.engine.targets.spotify_target import SpotifyTarget
+
+    monkeypatch.setattr("omni_sync.engine.spotify.all_playlists",
+                        lambda sp: [{"id": "own", "name": "Dup", "_owned": True},
+                                    {"id": "flw", "name": "Dup", "_owned": False}])
+    target = SpotifyTarget(object(), "cache.json")
+    assert target.find_playlist("flw")["id"] == "flw"
+
+
 def test_apple_description_handles_missing():
     assert AppleMusicTarget.playlist_description(None, {"attributes": {}}) == ""
     assert AppleMusicTarget.playlist_description(

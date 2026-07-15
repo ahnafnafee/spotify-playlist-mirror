@@ -65,6 +65,23 @@ class MirrorTarget:
         """Stable id of a library playlist, for explicit pairing lookups."""
         return playlist.get("id")
 
+    def find_playlist(self, playlist_id):
+        """A library playlist by its stable id, or None. Default scans the
+        name-keyed list_playlists(); a provider whose list_playlists() dedupes by
+        name (Spotify) overrides this to scan its full, un-deduped set so a followed
+        playlist stays reachable by id."""
+        return next((pl for pl in self.browse_playlists()
+                     if self.playlist_id(pl) == playlist_id), None)
+
+    def browse_playlists(self):
+        """All library playlists for the browse / transfer pickers, as a flat list
+        (NOT name-deduped like list_playlists). Each dict may carry `_owned`
+        (treated as True when absent). Override for a provider that also exposes
+        followed / non-owned playlists — see SpotifyTarget. The browse layer reads
+        name/id/count/image off these via the target's own accessors, so a new
+        provider needs no change to services.playlists.browse."""
+        return list(self.list_playlists().values())
+
     def playlist_name(self, playlist):
         """Display name of a library playlist (for transfers / labels)."""
         return playlist.get("name", "")
@@ -99,7 +116,7 @@ class MirrorTarget:
 
 
 def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, execute, max_removals,
-                max_adds, source_key="spotify", source_name="Spotify", name=None):
+                max_adds, drain_removals=False, source_key="spotify", source_name="Spotify", name=None):
     """Reconcile one source→target playlist pair. Returns a stats dict; `clean`
     is True when everything applied with no guard tripped.
 
@@ -164,12 +181,18 @@ def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, e
         additions, guard = additions[:max_adds], True
 
     removals, held = protect_removals(to_remove, not_found)
+    removals_skipped = 0
     if not sp_tracks and tgt_tracks:
-        log_warn(f"Spotify returned 0 tracks but {target.name} has {len(tgt_tracks)}; skipping all removals this pass", tag=tag)
+        log_warn(f"{source_name} returned 0 tracks but {target.name} has {len(tgt_tracks)}; skipping all removals this pass", tag=tag)
         removals, guard = [], True
     elif len(removals) > max_removals:
-        log_warn(f"{len(removals)} removals exceed --max-removals={max_removals}; skipping removals this pass", tag=tag)
-        removals, guard = [], True
+        if drain_removals:
+            log_warn(f"draining removals — applying {max_removals} now, {len(removals) - max_removals} next pass", tag=tag)
+            removals, guard = removals[:max_removals], True
+        else:
+            log_warn(f"{len(removals)} removals exceed --max-removals={max_removals}; held back "
+                     "(enable 'apply large removals' on this sync to drain them)", tag=tag)
+            removals_skipped, removals, guard = len(removals), [], True
 
     for _, label, method in additions:
         log_add(f"{label}  {paint('(' + method + ')', 'grey')}", dry=not execute, tag=tag)
@@ -196,6 +219,7 @@ def mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs, *, e
     return {
         "clean": execute and not guard, "added": len(additions), "removed": len(removals),
         "missing": len(not_found), "held": len(held), "deferred": deferred,
+        "removals_skipped": removals_skipped,
         "target_count": len(tgt_tracks) + len(additions) - len(removals),
     }
 
@@ -277,7 +301,8 @@ def _merge(prev, cur, collapsed):
     return desired, plan
 
 
-def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, max_adds, link_key=None):
+def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, max_adds,
+              drain_removals=False, link_key=None):
     """Reconcile one logical playlist across N provider peers, bidirectionally.
 
     playlists: {source: playlist dict}; caches: {source: resolution cache}.
@@ -322,9 +347,11 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
     desired, plan = _merge(prev, cur, collapsed)
     log_section(name, " / ".join(f"{p.name} {len(cur[p.source])}" for p in peers), tag="sync")
 
-    stats = {"clean": execute and not collapsed, "added": 0, "removed": 0, "missing": 0, "held": 0, "deferred": 0}
+    stats = {"clean": execute and not collapsed, "added": 0, "removed": 0, "missing": 0,
+             "held": 0, "deferred": 0, "removals_skipped": 0}
+    removals_capped = False   # any provider's removals hit the cap -> freeze the baseline
     new_links = {p.source: {} for p in peers}
-    new_state = {}   # source -> canonical membership to persist (only on a clean pass)
+    new_state = {}   # source -> canonical membership to persist (only when the baseline is safe)
     for p in peers:
         if p.source in collapsed:
             continue  # untrusted read: don't write to it this pass (guards adds too, not just removes)
@@ -370,12 +397,21 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
         # REMOVE: canonical ids that left the set, guarded by protect_removals + cap.
         remove_pairs = [(cid, canon[p.source][cid]) for cid in remove_ids]
         safe, held = protect_removals([n for _, n in remove_pairs], not_found)
+        if len(safe) > max_removals:
+            # Cap hit: freezing the baseline (removals_capped) is what keeps a
+            # held-back / mid-drain removal from being resurrected via union_prev.
+            removals_capped, stats["clean"] = True, False
+            if drain_removals:
+                log_warn(f"{p.name}/{name}: draining removals — applying {max_removals} now, "
+                         f"{len(safe) - max_removals} next pass", tag=p.tag)
+                safe = safe[:max_removals]
+            else:
+                log_warn(f"{p.name}/{name}: {len(safe)} removals exceed --max-removals={max_removals}; "
+                         "held back (enable 'apply large removals' on this sync to drain them)", tag=p.tag)
+                stats["removals_skipped"] += len(safe)
+                safe = []
         safe_ids = {id(n) for n in safe}
         removed_cids = {cid for cid, n in remove_pairs if id(n) in safe_ids}
-        if len(safe) > max_removals:
-            log_warn(f"{p.name}/{name}: {len(safe)} removals exceed --max-removals={max_removals}; "
-                     "skipping removals this pass", tag=p.tag)
-            safe, removed_cids, stats["clean"] = [], set(), False
 
         for tid, method, norm in additions:
             log_add(f"{p.name}: {norm['name']} - {norm['artist']}  {paint('(' + method + ')', 'grey')}",
@@ -408,7 +444,11 @@ def reconcile(peers, name, playlists, caches, songs, *, execute, max_removals, m
     if execute:
         for p in peers:
             archive.set_links(songs, p.source, new_links[p.source])
-        if stats["clean"]:
+        # Advance the removal baseline whenever reads were trusted and no removal was
+        # capped — deferred ADDS don't block it (they stay in `desired` via union_prev
+        # and re-add next pass), which is what lets removals activate on the pass after
+        # an add-heavy bootstrap instead of only after the whole backlog drains.
+        if not collapsed and not removals_capped:
             for src, ids in new_state.items():
                 archive.set_playlist_state(songs, key, src, ids)
 

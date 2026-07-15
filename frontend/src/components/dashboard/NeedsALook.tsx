@@ -14,9 +14,9 @@ interface NeedsLookItem {
   action?: { label: string; to: string }
 }
 
-/** Every item here traces back to a real field — account state/detail, or
- * the last pass's own ok flag and per-target held/deferred counts. Nothing
- * is invented (no fabricated "last synced" claims). */
+/** Every item here traces back to a real field — account state/detail, or the
+ * last pass's own ok flag and per-target held/deferred/removals-skipped counts.
+ * Nothing is invented (no fabricated "last synced" claims). */
 function buildItems(accounts: Account[] | null, status: SyncStatus | null): NeedsLookItem[] {
   const items: NeedsLookItem[] = []
 
@@ -63,8 +63,20 @@ function buildItems(accounts: Account[] | null, status: SyncStatus | null): Need
       key: 'held',
       icon: LuTriangleAlert,
       title: `${heldTotal} change${heldTotal === 1 ? '' : 's'} held from the last pass`,
-      description: 'A removal passed your safety cap, or a service needs a follow-up pass. Nothing was lost.',
+      description: 'A service needs a follow-up pass — an unmatched track was kept, or additions exceeded the cap. Nothing was lost.',
       action: { label: 'Review caps', to: '/sync' },
+    })
+  }
+
+  const removalsSkipped = status?.last?.per_target.reduce((sum, t) => sum + (t.removals_skipped ?? 0), 0) ?? 0
+  if (removalsSkipped > 0) {
+    items.push({
+      key: 'removals-skipped',
+      icon: LuTriangleAlert,
+      title: `${removalsSkipped} removal${removalsSkipped === 1 ? '' : 's'} held back for safety`,
+      description:
+        'They exceeded the per-pass removal cap. Turn on "Apply large removals" for the sync to delete them in batches over the next passes.',
+      action: { label: 'Open sync', to: '/sync' },
     })
   }
 

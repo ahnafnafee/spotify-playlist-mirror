@@ -74,7 +74,8 @@ export function buildSyncSummaryRows(job: SyncJob, peers: Account[], downloadDir
   else playlistsValue = `${playlistNames.slice(0, 3).join(', ')} +${playlistNames.length - 3} more`
   rows.push({ label: 'Playlists', value: playlistsValue })
 
-  rows.push({ label: 'Limits', value: `≤${job.max_adds} adds, ≤${job.max_removals} removals / pass` })
+  const removalNote = job.apply_large_removals ? ' (large removals drained in batches)' : ''
+  rows.push({ label: 'Limits', value: `≤${job.max_adds} adds, ≤${job.max_removals} removals / pass${removalNote}` })
 
   rows.push({
     label: 'Downloads',

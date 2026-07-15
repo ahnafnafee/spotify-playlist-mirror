@@ -118,6 +118,43 @@ export function PlaylistPickerField({
     }
   }, [open])
 
+  // Only Spotify sets `owned` today; when a list mixes owned and followed we split
+  // it under Created/Followed headers, owned first. All-one-kind lists stay flat.
+  const ownedPlaylists = useMemo(() => filtered.filter((p) => p.owned !== false), [filtered])
+  const followedPlaylists = useMemo(() => filtered.filter((p) => p.owned === false), [filtered])
+  const grouped = ownedPlaylists.length > 0 && followedPlaylists.length > 0
+
+  const renderOption = (p: ProviderPlaylist) => {
+    const reason = optionDisabledReason?.(p)
+    return (
+      <button
+        key={p.id}
+        type="button"
+        role="option"
+        aria-selected={p.id === value}
+        aria-disabled={reason ? true : undefined}
+        disabled={Boolean(reason)}
+        title={reason}
+        onClick={() => select(p.id)}
+        className={cn(
+          'flex items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors duration-fast',
+          reason ? 'cursor-not-allowed opacity-50' : p.id === value ? 'bg-accent-soft' : 'hover:bg-surface-2',
+        )}
+      >
+        <CoverArt image={p.image} />
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{p.name}</span>
+        {reason ? (
+          <span className="shrink-0 font-mono text-[10.5px] text-text-3">{reason}</span>
+        ) : (
+          formatTrackCount(p.count) && (
+            <span className="shrink-0 font-mono text-[11px] text-text-3">{formatTrackCount(p.count)}</span>
+          )
+        )}
+        {p.id === value && <LuCheck className="size-3.5 shrink-0 text-accent" aria-hidden="true" />}
+      </button>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={fieldId} className="text-[12.5px] font-semibold text-text-2">
@@ -182,41 +219,19 @@ export function PlaylistPickerField({
             <div id={listboxId} role="listbox" aria-label={label} className="thin-scrollbar flex max-h-56 flex-col gap-0.5 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p className="px-2 py-3 text-center text-xs text-text-3">No playlists match "{search}".</p>
+              ) : grouped ? (
+                <>
+                  <div className="px-2 pb-0.5 pt-1 font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-text-3">
+                    Created
+                  </div>
+                  {ownedPlaylists.map(renderOption)}
+                  <div className="mt-1 border-t border-border px-2 pb-0.5 pt-2 font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-text-3">
+                    Followed
+                  </div>
+                  {followedPlaylists.map(renderOption)}
+                </>
               ) : (
-                filtered.map((p) => {
-                  const reason = optionDisabledReason?.(p)
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      role="option"
-                      aria-selected={p.id === value}
-                      aria-disabled={reason ? true : undefined}
-                      disabled={Boolean(reason)}
-                      title={reason}
-                      onClick={() => select(p.id)}
-                      className={cn(
-                        'flex items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors duration-fast',
-                        reason
-                          ? 'cursor-not-allowed opacity-50'
-                          : p.id === value
-                            ? 'bg-accent-soft'
-                            : 'hover:bg-surface-2',
-                      )}
-                    >
-                      <CoverArt image={p.image} />
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-text">{p.name}</span>
-                      {reason ? (
-                        <span className="shrink-0 font-mono text-[10.5px] text-text-3">{reason}</span>
-                      ) : (
-                        formatTrackCount(p.count) && (
-                          <span className="shrink-0 font-mono text-[11px] text-text-3">{formatTrackCount(p.count)}</span>
-                        )
-                      )}
-                      {p.id === value && <LuCheck className="size-3.5 shrink-0 text-accent" aria-hidden="true" />}
-                    </button>
-                  )
-                })
+                filtered.map(renderOption)
               )}
             </div>
           </div>,

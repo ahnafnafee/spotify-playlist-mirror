@@ -149,6 +149,93 @@ def test_reconcile_uses_link_key_for_state():
     conn.close()
 
 
+class _P:
+    """Reconcile peer with a controllable ISRC set that reflects adds/removes —
+    for exercising the persist gate + removal draining across passes."""
+
+    def __init__(self, source, isrcs):
+        self.source = self.tag = self.name = source
+        self._isrcs = list(isrcs)
+        self.removed = []
+
+    def playlist_tracks(self, pl):
+        return [{"id": f"{self.source}-{i}", "name": f"Song {i}", "artists": ["A"], "artist": "A",
+                 "duration_ms": 1000, "isrc": i, "added_at": "2020"} for i in self._isrcs]
+
+    def track_id(self, t):
+        return t.get("id")
+
+    def prefetch(self, norms, cache):
+        pass
+
+    def native_isrc_map(self, cache):
+        return {}
+
+    def resolve(self, norm, cache):
+        return f"{self.source}-{norm['isrc']}", "search"
+
+    def add(self, pl, ids):
+        for tid in ids:
+            isrc = tid.split("-", 1)[1]
+            if isrc not in self._isrcs:
+                self._isrcs.append(isrc)
+
+    def remove(self, pl, raw):
+        self.removed.append(raw["isrc"])
+        if raw["isrc"] in self._isrcs:
+            self._isrcs.remove(raw["isrc"])
+
+
+def _caches(*sources):
+    return {s: {"isrc": {}, "search": {}, "dirty": False} for s in sources}
+
+
+def test_reconcile_saves_baseline_when_only_adds_deferred(tmp_path):
+    # The bootstrap fix: a pass that merely DEFERS adds (max_adds hit) is not
+    # "clean", yet its per-provider removal baseline must still be recorded — else
+    # removals can never activate until the whole add backlog drains.
+    conn = archive.connect(str(tmp_path / "s.db"))
+    sp, ap = _P("spotify", ["A", "B", "C"]), _P("apple", ["A"])  # apple missing B, C
+    stats = reconcile([sp, ap], "Mix", {"spotify": {"id": "s"}, "apple": {"id": "a"}},
+                      _caches("spotify", "apple"), conn, execute=True, max_removals=25, max_adds=1)
+    assert stats["deferred"] >= 1 and stats["clean"] is False   # add backlog deferred
+    assert archive.get_playlist_state(conn, "mix", "spotify") == {"i:A", "i:B", "i:C"}  # baseline still saved
+    conn.close()
+
+
+def test_large_removals_held_back_by_default_then_drain_when_opted_in(tmp_path):
+    isrcs = list("ABCDEFGHIJ")
+
+    def fresh():
+        conn = archive.connect(str(tmp_path.joinpath(f"s{len(isrcs)}.db")))
+        for src in ("spotify", "apple"):
+            archive.set_playlist_state(conn, "mix", src, {f"i:{i}" for i in isrcs})
+        sp = _P("spotify", ["A", "B", "C", "H", "I", "J"])  # user dropped D,E,F,G (keeps 6/10 -> no collapse)
+        ap = _P("apple", list(isrcs))
+        return conn, sp, ap
+
+    playlists = {"spotify": {"id": "s"}, "apple": {"id": "a"}}
+
+    # Default: 4 removals > max_removals=2 -> held back entirely, surfaced, baseline frozen.
+    conn, sp, ap = fresh()
+    stats = reconcile([sp, ap], "Mix", playlists, _caches("spotify", "apple"), conn,
+                      execute=True, max_removals=2, max_adds=200, drain_removals=False)
+    assert stats["removals_skipped"] == 4 and ap.removed == []
+    assert archive.get_playlist_state(conn, "mix", "apple") == {f"i:{i}" for i in isrcs}  # not advanced
+    conn.close()
+
+    # Opt-in: drains 2/pass across two passes, advancing the baseline only once cleared.
+    conn, sp, ap = fresh()
+    reconcile([sp, ap], "Mix", playlists, _caches("spotify", "apple"), conn,
+              execute=True, max_removals=2, max_adds=200, drain_removals=True)
+    assert len(ap.removed) == 2 and archive.get_playlist_state(conn, "mix", "apple") == {f"i:{i}" for i in isrcs}
+    reconcile([sp, ap], "Mix", playlists, _caches("spotify", "apple"), conn,
+              execute=True, max_removals=2, max_adds=200, drain_removals=True)
+    assert len(ap.removed) == 4  # fully drained
+    assert archive.get_playlist_state(conn, "mix", "apple") == {f"i:{i}" for i in ("A", "B", "C", "H", "I", "J")}
+    conn.close()
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:

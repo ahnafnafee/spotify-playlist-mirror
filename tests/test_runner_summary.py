@@ -86,10 +86,11 @@ def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
     captured = {}
 
     def fake_mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs_, *,
-                         execute, max_removals, max_adds, source_key="spotify", source_name="Spotify", name=None):
+                         execute, max_removals, max_adds, drain_removals=False,
+                         source_key="spotify", source_name="Spotify", name=None):
         captured["tgt_id"] = tgt_playlist["id"]
         return {"clean": True, "added": 1, "removed": 0, "missing": 0, "held": 0,
-                "deferred": 0, "target_count": 1}
+                "deferred": 0, "removals_skipped": 0, "target_count": 1}
 
     monkeypatch.setattr(runner, "mirror_pair", fake_mirror_pair)
 

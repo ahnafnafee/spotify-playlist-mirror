@@ -54,6 +54,7 @@ class SyncService:
         opts.playlists = job.playlists
         opts.max_adds = job.max_adds
         opts.max_removals = job.max_removals
+        opts.apply_large_removals = job.apply_large_removals
         # OMNI_DOWNLOAD_DIR (a container-internal bind-mount path set by
         # docker-compose) wins over the UI-saved DOWNLOAD_DIR: inside the
         # container that UI value can be a host path (e.g. a Windows F:\ path)
