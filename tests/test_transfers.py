@@ -45,6 +45,42 @@ def test_transfer_copies_matches_skips_dupes_reports_conflicts():
     # "Dup" already exists on the destination (same track_key) -> skipped, not re-added
 
 
+def test_transfer_same_provider_copies_by_id_without_resolving():
+    # Spotify -> Spotify (e.g. a followed list into a new owned one): the track's own
+    # id is already valid on the destination, so transfer() copies it directly and
+    # never invokes the fuzzy resolver.
+    added, resolved = [], []
+
+    class _SpotifySrc:
+        source = "spotify"
+
+        def playlist_tracks(self, pl):
+            return [{"id": "t1", "name": "One", "artists": ["A"], "duration_ms": 1, "added_at": "1"},
+                    {"id": "t2", "name": "Two", "artists": ["B"], "duration_ms": 1, "added_at": "2"}]
+
+        def track_id(self, raw):
+            return raw["id"]
+
+    class _SpotifyDst:
+        source = "spotify"
+
+        def playlist_tracks(self, pl):
+            return []
+
+        def resolve(self, norm, cache):
+            resolved.append(norm["name"])  # must never be called for same-provider
+            return (None, None)
+
+        def add(self, pl, ids):
+            added.extend(ids)
+
+    res = transfer(_SpotifySrc(), _SpotifyDst(), {"id": "s"}, {"id": "d"},
+                   {"search": {}, "isrc": {}, "dirty": False}, execute=True, max_adds=100)
+    assert res["added"] == 2
+    assert added == ["t1", "t2"]   # copied by their own ids, oldest-first
+    assert resolved == []          # resolver never invoked
+
+
 def test_transfer_dry_run_adds_nothing():
     added = []
     res = transfer(_Src(), _dst_factory(added), {"id": "s"}, {"id": "d"},
@@ -117,7 +153,7 @@ def test_run_exclusive_queues_behind_sync(monkeypatch, tmp_path):
     async def scenario():
         import omni_sync.services.sync_service as m
 
-        async def fake_pass(opts):
+        async def fake_pass(opts, should_continue=None):
             order.append("sync-start")
             await asyncio.sleep(0.05)
             order.append("sync-end")
@@ -138,8 +174,8 @@ def test_run_exclusive_queues_behind_sync(monkeypatch, tmp_path):
 
 
 class _Prov:
-    def __init__(self, cache_file, tracks):
-        self.name, self.source, self.cache_file = "Prov", "apple", cache_file
+    def __init__(self, cache_file, tracks, source="apple"):
+        self.name, self.source, self.cache_file = "Prov", source, cache_file
         self._tracks = tracks
 
     def list_playlists(self):
@@ -147,6 +183,9 @@ class _Prov:
 
     def playlist_id(self, pl):
         return pl.get("id")
+
+    def find_playlist(self, playlist_id):
+        return next((pl for pl in self.list_playlists().values() if self.playlist_id(pl) == playlist_id), None)
 
     def playlist_name(self, pl):
         return pl.get("name", "")
@@ -179,7 +218,7 @@ def _service(monkeypatch, tmp_path):
     src = _Prov(str(tmp_path / "s.json"),
                 [{"id": "t", "name": "Song", "artists": ["A"], "artist": "A",
                   "duration_ms": 1, "isrc": "I", "added_at": "1"}])
-    dst = _Prov(str(tmp_path / "d.json"), [])  # empty destination
+    dst = _Prov(str(tmp_path / "d.json"), [], source="ytmusic")  # empty destination, other provider
     monkeypatch.setattr(TransferService, "_build",
                         lambda self, pid, opts, s=src, d=dst: s if pid == "apple" else d)
     return src, dst

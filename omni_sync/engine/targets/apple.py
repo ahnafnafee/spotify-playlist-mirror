@@ -273,3 +273,32 @@ class AppleMusicTarget(MirrorTarget):
         self._request("DELETE", f"{AMP}/me/library/playlists/{playlist['id']}/tracks",
                      params={"ids[library-songs]": track["relationship_id"], "mode": "all"})
         polite_sleep(0.4)
+
+    def remove_occurrences(self, playlist, positioned):
+        """Apple's tracks-DELETE addresses the library SONG, not one entry —
+        duplicate copies share one library id, so deleting a flagged copy would
+        take its keeper with it. Delete each flagged song once, then re-append
+        one copy per surviving (unflagged) entry of that song. The re-appended
+        keeper lands at the playlist's end (Apple has no positional insert); if
+        its catalog id is no longer addable (delisted release), the next sync
+        pass restores the song via search."""
+        totals = {}
+        for t in self.playlist_tracks(playlist):
+            rid = t.get("relationship_id")
+            totals[rid] = totals.get(rid, 0) + 1
+        flagged, catalog = {}, {}
+        for _, raw in positioned:
+            rid = raw.get("relationship_id")
+            if not rid:
+                continue
+            flagged[rid] = flagged.get(rid, 0) + 1
+            catalog.setdefault(rid, raw.get("catalog_id"))
+        for rid, n in flagged.items():
+            self.remove(playlist, {"relationship_id": rid})
+            keep = totals.get(rid, n) - n
+            if keep > 0 and catalog.get(rid):
+                try:
+                    self.add(playlist, [catalog[rid]] * keep)
+                except Exception as e:
+                    log_warn(f"couldn't re-append the kept copy of {catalog[rid]} ({e!r}); "
+                             "the next sync pass restores it via search", tag=self.tag)

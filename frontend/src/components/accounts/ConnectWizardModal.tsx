@@ -140,7 +140,9 @@ const CONNECT_GUIDES: Record<string, ConnectGuideContent> = {
     intro: 'Optional: connect Jellyfin to push real playlist cover art. You need the server URL and an API key.',
     steps: [
       <>
-        <strong>Server URL</strong>: where Jellyfin runs, e.g. <Code>http://localhost:8096</Code>.
+        <strong>Server URL</strong>: where Jellyfin runs, e.g. <Code>http://localhost:8096</Code>. If this
+        app runs in Docker, use <Code>http://host.docker.internal:8096</Code> — inside the container{' '}
+        <Code>localhost</Code> is the container itself, not your host.
       </>,
       <>
         In Jellyfin, open <strong>Dashboard → API Keys</strong> (under Advanced).

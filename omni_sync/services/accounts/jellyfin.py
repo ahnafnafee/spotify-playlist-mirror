@@ -10,7 +10,7 @@ class JellyfinConnector(Connector):
     name = "Jellyfin"
     auth_kind = "api_key"
     config_fields = [
-        Field("JELLYFIN_URL", "Server URL", help="e.g. http://localhost:8096"),
+        Field("JELLYFIN_URL", "Server URL", help="e.g. http://localhost:8096 (in Docker: http://host.docker.internal:8096)"),
         Field("JELLYFIN_API_KEY", "API key", secret=True, help="Jellyfin Dashboard → API Keys → New"),
         Field("JELLYFIN_USER_ID", "User ID", required=False, help="Optional; only if listing playlists needs it"),
     ]

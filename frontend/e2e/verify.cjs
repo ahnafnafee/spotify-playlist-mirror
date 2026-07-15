@@ -1099,17 +1099,16 @@ async function main() {
       console.log(`${activeChecked === 'true' ? 'ok        ' : 'FAIL      '} Wizard Schedule (step 4): Active reflects the job's own enabled field (aria-checked="${activeChecked}")`)
       if (activeChecked !== 'true') results.push({ label: 'wizard schedule active', overflow: true })
 
-      // Next must disable when the interval is invalid, and re-enable once
-      // it's fixed — Direction/Services/Playlists have no such gate.
-      const intervalInput = page.getByLabel('Interval', { exact: true })
-      await intervalInput.fill('not-an-interval')
-      const nextDisabledWhenInvalid = await page.getByRole('button', { name: 'Next', exact: true }).isDisabled()
-      console.log(`${nextDisabledWhenInvalid ? 'ok        ' : 'FAIL      '} Wizard Schedule: Next disables when the interval is invalid`)
-      if (!nextDisabledWhenInvalid) results.push({ label: 'wizard next disabled invalid interval', overflow: true })
-      await intervalInput.fill('30m')
-      const nextEnabledWhenValid = await page.getByRole('button', { name: 'Next', exact: true }).isEnabled()
-      console.log(`${nextEnabledWhenValid ? 'ok        ' : 'FAIL      '} Wizard Schedule: Next re-enables once the interval is valid again`)
-      if (!nextEnabledWhenValid) results.push({ label: 'wizard next enabled valid interval', overflow: true })
+      // Interval is a preset dropdown now (it was a free-text field with a
+      // validity gate) — selecting a preset applies it, and a dropdown has no
+      // invalid state. Keep it on 30m: the review + save-round-trip checks below
+      // assert on that value. The Next-disable gate is still covered by the
+      // numeric caps on the Limits step.
+      const intervalSelect = page.getByLabel('Interval', { exact: true })
+      await intervalSelect.selectOption('30m')
+      const intervalValue = await intervalSelect.inputValue()
+      console.log(`${intervalValue === '30m' ? 'ok        ' : 'FAIL      '} Wizard Schedule: interval preset dropdown applies the choice (got "${intervalValue}")`)
+      if (intervalValue !== '30m') results.push({ label: 'wizard interval preset', overflow: true })
       await checkOverflow(page, `Wizard step 4 Schedule @ ${width}`, results)
       await shot(page, `wizard-step4-schedule-${width}`)
 

@@ -33,6 +33,7 @@ class SyncJob:
     interval: str = DEFAULT_INTERVAL          # this job's own auto-sync cadence
     max_adds: int = DEFAULT_MAX_ADDS
     max_removals: int = DEFAULT_MAX_REMOVALS
+    apply_large_removals: bool = False        # drain removals over max_removals across passes (default: hold back)
     download: bool = False                    # opt into the global download mirror
     id: str = ""
 

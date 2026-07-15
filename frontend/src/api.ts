@@ -97,6 +97,9 @@ export const api = {
   deleteSync: (id: string) => request<OkResponse>(`/api/syncs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   runSyncJob: (id: string, execute: boolean) =>
     request<RunResponse>(`/api/syncs/${encodeURIComponent(id)}/run?execute=${execute ? 1 : 0}`, { method: 'POST' }),
+  pauseSyncJob: (id: string) => request<OkResponse>(`/api/syncs/${encodeURIComponent(id)}/pause`, { method: 'POST' }),
+  stopSyncJob: (id: string) => request<OkResponse>(`/api/syncs/${encodeURIComponent(id)}/stop`, { method: 'POST' }),
+  resumeSyncJob: (id: string) => request<OkResponse>(`/api/syncs/${encodeURIComponent(id)}/resume`, { method: 'POST' }),
 
   // Playlists (browse)
   getPlaylists: (provider: string) =>

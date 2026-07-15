@@ -21,7 +21,7 @@ def test_run_job_coalesces(monkeypatch, tmp_path):
     async def scenario():
         import omni_sync.services.sync_service as m
 
-        async def fake_pass(opts):
+        async def fake_pass(opts, should_continue=None):
             calls.append("start")
             await asyncio.sleep(0.05)
             calls.append("end")
@@ -39,11 +39,68 @@ def test_run_job_coalesces(monkeypatch, tmp_path):
     assert calls == ["start", "end"]  # the overlapping duplicate trigger was coalesced
 
 
+def test_pause_marks_job_resumable(monkeypatch, tmp_path):
+    # Pause only affects the running job; the interrupted pass is recorded as
+    # "paused" so the card can offer Resume.
+    async def scenario():
+        import omni_sync.services.sync_service as m
+
+        started, release = asyncio.Event(), asyncio.Event()
+
+        async def held_pass(opts, should_continue=None):
+            started.set()
+            await release.wait()
+            return {"ok": True, "per_target": [], "interrupted": should_continue()}
+
+        monkeypatch.setattr(m, "_run_pass_async", held_pass)
+        bus = EventBus()
+        bus.bind_loop(asyncio.get_running_loop())
+        svc, jid = _svc(tmp_path, bus)
+        task = asyncio.create_task(svc.run_job(jid, True))
+        await started.wait()                       # pass is now running
+        assert svc.stop("other") is False          # only the running job responds
+        assert svc.pause(jid) is True and svc._control == "pause"
+        release.set()
+        await task
+        st = svc.status()
+        assert st["last"]["interrupted"] == "pause"
+        assert st["jobs"][0]["paused"] is True
+
+    asyncio.run(scenario())
+
+
+def test_resume_reruns_a_paused_job(monkeypatch, tmp_path):
+    runs = []
+
+    async def scenario():
+        import omni_sync.services.sync_service as m
+
+        async def fake_pass(opts, should_continue=None):
+            runs.append(1)
+            return {"ok": True, "per_target": [], "interrupted": None}
+
+        monkeypatch.setattr(m, "_run_pass_async", fake_pass)
+        bus = EventBus()
+        bus.bind_loop(asyncio.get_running_loop())
+        svc, jid = _svc(tmp_path, bus)
+        assert svc.resume(jid) is False            # not paused -> no-op
+        svc._interrupted[jid] = "paused"           # simulate a paused job
+        assert svc.resume(jid) is True
+        for _ in range(50):
+            if runs:
+                break
+            await asyncio.sleep(0.01)
+        assert runs == [1]                         # resume triggered exactly one re-run
+        assert svc.status()["jobs"][0]["paused"] is False  # cleared once it re-ran
+
+    asyncio.run(scenario())
+
+
 def test_run_job_records_failure(monkeypatch, tmp_path):
     async def scenario():
         import omni_sync.services.sync_service as m
 
-        async def boom(opts):
+        async def boom(opts, should_continue=None):
             raise RuntimeError("nope")
 
         monkeypatch.setattr(m, "_run_pass_async", boom)

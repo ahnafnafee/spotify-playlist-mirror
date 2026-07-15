@@ -190,7 +190,8 @@ class YTMusicTarget(MirrorTarget):
             key = title.casefold()
             if key and key not in out:
                 out[key] = {"playlistId": pl["id"], "title": title,
-                            "count": pl.get("contentDetails", {}).get("itemCount")}
+                            "count": pl.get("contentDetails", {}).get("itemCount"),
+                            "thumbnails": pl.get("snippet", {}).get("thumbnails")}  # cover art for browse
         return out
 
     def is_editable(self, playlist):
@@ -310,7 +311,8 @@ class YTMusicBrowserTarget(YTMusicTarget):
             title = (pl.get("title") or "").strip()
             key = title.casefold()
             if key and key not in out:
-                out[key] = {"playlistId": pl.get("playlistId"), "title": title, "count": pl.get("count")}
+                out[key] = {"playlistId": pl.get("playlistId"), "title": title, "count": pl.get("count"),
+                            "thumbnails": pl.get("thumbnails")}  # cover art for browse
         return out
 
     def create(self, sp_playlist):

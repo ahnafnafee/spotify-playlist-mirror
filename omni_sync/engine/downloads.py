@@ -649,7 +649,7 @@ def refresh(sp, spotify_playlists, download_dir):
         log_warn(f"refresh failed: {e!r}", tag="local")
 
 
-def run(sp, spotify_playlists, download_dir):
+def run(sp, spotify_playlists, download_dir, should_continue=None):
     """Never raises out; logs one skip line if spotdl/ffmpeg aren't set up.
 
     Per-playlist download state (Spotify snapshot_id, track ids, and the set of
@@ -676,6 +676,8 @@ def run(sp, spotify_playlists, download_dir):
         dirty = False
         used = set()
         for playlist in spotify_playlists:
+            if should_continue and should_continue() != "run":
+                break  # Stop/Pause requested — halt before the next download
             name = playlist.get("name") or playlist.get("id", "playlist")
             pid = playlist.get("id", "")
             folder = _folder_for(base, playlist, used)

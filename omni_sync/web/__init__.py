@@ -53,7 +53,7 @@ def create_app(settings=None, bus=None, sync_service=None, links=None, transfers
         try:
             yield
         finally:
-            await sync_service.stop()
+            await sync_service.shutdown()
 
     app = FastAPI(title="Omni Playlist Sync", lifespan=lifespan)
     app.state.settings = settings

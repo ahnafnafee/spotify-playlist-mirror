@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn'
 import { buildSyncSummaryRows } from '@/lib/syncSummary'
 import type { Account, SyncJob } from '@/types'
 
+import { SyncControls } from './SyncControls'
 import { SyncRunButtons } from './SyncRunButtons'
 
 interface Props {
@@ -24,6 +25,11 @@ interface Props {
    * queued up while one runs). Shows a "Queued" badge and, like `running`,
    * guards against re-triggering this same job. */
   queued: boolean
+  /** Its last pass was cut short by Pause, per `jobs[].paused` — shows a Resume
+   * button (re-runs; reconcile is idempotent so it picks up the remainder). */
+  paused: boolean
+  /** While running, a pause/stop requested but not yet in effect ("Pausing…"). */
+  pending: 'pause' | 'stop' | null
   onEdit: () => void
   onChanged: () => void
 }
@@ -34,7 +40,7 @@ interface Props {
  * (matching AccountCard's pattern) — the wizard (via Edit) is the only
  * place the job's actual config fields are changed; this card is for
  * at-a-glance management. */
-export function SyncJobCard({ job, peers, running, queued, onEdit, onChanged }: Props) {
+export function SyncJobCard({ job, peers, running, queued, paused, pending, onEdit, onChanged }: Props) {
   const [togglingEnabled, setTogglingEnabled] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -119,6 +125,7 @@ export function SyncJobCard({ job, peers, running, queued, onEdit, onChanged }: 
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
         <SyncRunButtons job={job} disabled={running || queued} onChanged={onChanged} />
+        <SyncControls jobId={job.id} running={running} paused={paused} pending={pending} onChanged={onChanged} onError={setError} />
         <Button variant="secondary" size="sm" icon={<LuPencil className="size-3.5" aria-hidden="true" />} onClick={onEdit}>
           Edit
         </Button>

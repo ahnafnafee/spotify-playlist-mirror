@@ -47,7 +47,7 @@ def test_nway_wraps_accumulated_summary(monkeypatch):
     monkeypatch.setattr(runner, "_post_sync", lambda *a, **k: None)
     monkeypatch.setattr(
         runner, "_run_nway",
-        lambda opts, sp, selected, songs: [runner._summary_entry("N-way", {"added": 3, "removed": 1})],
+        lambda opts, sp, selected, songs, should_continue=None: [runner._summary_entry("N-way", {"added": 3, "removed": 1})],
     )
     s = runner.run_pass(_opts(sync_mode="nway"))
     assert s["mode"] == "nway"
@@ -86,10 +86,11 @@ def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
     captured = {}
 
     def fake_mirror_pair(target, sp_tracks, sp_playlist, tgt_playlist, cache, songs_, *,
-                         execute, max_removals, max_adds, source_key="spotify", source_name="Spotify", name=None):
+                         execute, max_removals, max_adds, drain_removals=False, should_continue=None,
+                         source_key="spotify", source_name="Spotify", name=None):
         captured["tgt_id"] = tgt_playlist["id"]
         return {"clean": True, "added": 1, "removed": 0, "missing": 0, "held": 0,
-                "deferred": 0, "target_count": 1}
+                "deferred": 0, "removals_skipped": 0, "target_count": 1}
 
     monkeypatch.setattr(runner, "mirror_pair", fake_mirror_pair)
 
@@ -102,6 +103,43 @@ def test_run_target_honors_explicit_pairing(monkeypatch, tmp_path):
     assert agg["added"] == 1
     assert archive.get_state(songs, "LINK1", "apple") is not None  # state keyed by the link id
     songs.close()
+
+
+def test_run_target_stops_between_playlists_on_control(tmp_path):
+    # The Stop/Pause hook: run_target checks should_continue at each playlist
+    # boundary and halts, leaving the rest for a re-run.
+    from omni_sync.engine import archive
+    from omni_sync.engine.runner import run_target
+
+    songs = archive.connect(str(tmp_path / "s.db"))
+    names = []
+
+    class Source:
+        source, name = "spotify", "Spotify"
+
+        def playlist_name(self, pl):
+            names.append(pl["name"])  # counts playlists whose iteration actually starts
+            return pl["name"]
+
+        def playlist_id(self, pl):
+            return pl.get("id")
+
+    class Target:
+        name, tag, source = "Apple Music", "apple", "apple"
+        cache_file = str(tmp_path / "c.json")
+
+        def list_playlists(self):
+            return {}  # nothing exists -> dry-run "would create" path, no writes
+
+        def playlist_id(self, pl):
+            return pl.get("id")
+
+    control = iter(["run", "stop"])  # process the 1st playlist, stop before the 2nd
+    selected = [{"id": "p1", "name": "One"}, {"id": "p2", "name": "Two"}]
+    run_target(Target(), selected, lambda pl: [], songs, _opts(),
+               source=Source(), should_continue=lambda: next(control, "stop"))
+    songs.close()
+    assert names == ["One"]  # halted at the playlist boundary, never reached "Two"
 
 
 def test_mirror_pair_non_spotify_source_never_writes_links(tmp_path):

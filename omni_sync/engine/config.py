@@ -68,6 +68,7 @@ class Options:
     providers: str = DEFAULT_PROVIDERS
     sync_source: str = DEFAULT_SYNC_SOURCE
     spotify_cache_file: str = DEFAULT_SPOTIFY_CACHE_FILE
+    apply_large_removals: bool = False
 
 
 def parse_args(argv=None):
@@ -85,6 +86,9 @@ def parse_args(argv=None):
                    help=f"Per-playlist removal cap per pass; more than this skips removals (default: {DEFAULT_MAX_REMOVALS}).")
     p.add_argument("--max-adds", type=int, default=int(os.getenv("MAX_ADDS", DEFAULT_MAX_ADDS)),
                    help=f"Per-playlist additions cap per pass; the rest continue next pass (default: {DEFAULT_MAX_ADDS}).")
+    p.add_argument("--apply-large-removals", action="store_true", default=os.getenv("APPLY_LARGE_REMOVALS") == "1",
+                   help="Drain removals over --max-removals in batches across passes instead of holding "
+                        "them back (default: held back for safety).")
     p.add_argument("--download-dir", default=os.getenv("DOWNLOAD_DIR", ""),
                    help="Also mirror the paired playlists to local audio files under this folder (requires --execute).")
     p.add_argument("--refresh-local", action="store_true",
@@ -117,4 +121,5 @@ def parse_args(argv=None):
         storefront=a.storefront, cache_file=a.cache_file, song_cache_file=a.song_cache_file,
         refresh_local=a.refresh_local, sync_mode=a.sync_mode, providers=a.providers,
         sync_source=a.sync_source, spotify_cache_file=a.spotify_cache_file,
+        apply_large_removals=a.apply_large_removals,
     )

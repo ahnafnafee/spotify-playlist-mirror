@@ -107,6 +107,26 @@ def playlists_by_name(sp):
     return {name: playlist for name, (rank, playlist) in best.items()}
 
 
+def all_playlists(sp):
+    """Every library playlist (owned AND followed), un-deduped, each annotated with
+    `_owned` (its owner is the current user). playlists_by_name collapses by name
+    for the sync engine's name-matching; browsing and transfers need the full,
+    id-addressable list so a followed playlist that shares a name with an owned one
+    stays reachable and can be labelled as followed."""
+    me = _retry(lambda: sp.current_user(), "current_user")["id"]
+    out = []
+    results = _retry(lambda: sp.current_user_playlists(limit=50), "playlists")
+    while results:
+        for playlist in results.get("items", []):
+            if not playlist:
+                continue
+            playlist["_owned"] = (playlist.get("owner") or {}).get("id") == me
+            out.append(playlist)
+        page = results
+        results = _retry(lambda: sp.next(page), "playlists page") if results.get("next") else None
+    return out
+
+
 def playlist_item_track(item):
     """The track object of a playlist item, handling both the legacy shape
     ({"track": {...}}) and the current Web API shape ({"item": {...}}). Returns

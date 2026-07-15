@@ -59,32 +59,32 @@ def test_browse_normalizes_rows(monkeypatch, tmp_path):
         def list_playlists(self):
             return {"chill": {"id": "1", "name": "Chill", "tracks": {"total": 5}}}
 
+        def browse_playlists(self):
+            return list(self.list_playlists().values())
+
         def playlist_count(self, pl):
             return (pl.get("tracks") or {}).get("total")
 
     monkeypatch.setattr("omni_sync.services.playlists.build_one", lambda pid, opts, sp=None: FakeTarget())
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("apple")
-    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": ""}]
+    assert rows == [{"id": "1", "name": "Chill", "count": 5, "image": "", "owned": True}]
 
 
 def test_browse_lists_followed_spotify_playlists(monkeypatch, tmp_path):
-    # Spotify browse lists followed (non-owned) playlists alongside owned ones —
-    # they're transferable via the web-player fallback, so none are filtered out.
+    # Spotify browse lists followed (non-owned) playlists alongside owned ones, via
+    # the un-deduped all_playlists(), and labels each with `owned` so the UI can
+    # divide Created from Followed.
     from omni_sync.services.playlists import PlaylistService
     from omni_sync.services.settings import SettingsStore
 
-    class FakeSpotify:
-        def list_playlists(self):
-            return {"mine": {"id": "1", "name": "Mine", "owner": {"id": "me"}},
-                    "theirs": {"id": "2", "name": "Theirs", "owner": {"id": "other"}}}
-
-        def playlist_count(self, pl):
-            return None
-
     monkeypatch.setattr("omni_sync.services.playlists.spotify.client", lambda *a, **k: object())
-    monkeypatch.setattr("omni_sync.services.playlists.build_one", lambda pid, opts, sp=None: FakeSpotify())
+    monkeypatch.setattr(
+        "omni_sync.services.playlists.spotify.all_playlists",
+        lambda sp: [{"id": "1", "name": "Mine", "owner": {"id": "me"}, "_owned": True},
+                    {"id": "2", "name": "Theirs", "owner": {"id": "other"}, "_owned": False}],
+    )
     rows = PlaylistService(SettingsStore(dir=tmp_path)).browse("spotify")
-    assert {r["name"] for r in rows} == {"Mine", "Theirs"}
+    assert {r["name"]: r["owned"] for r in rows} == {"Mine": True, "Theirs": False}
 
 
 def test_track_total_reads_both_shapes():

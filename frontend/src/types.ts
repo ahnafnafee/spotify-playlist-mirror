@@ -73,6 +73,9 @@ export interface TargetSummary {
   missing: number
   held: number
   deferred: number
+  /** Removals held back this pass because they exceeded max_removals and the sync
+   * hasn't opted into draining them — surfaced so the skip isn't silent. */
+  removals_skipped: number
   created: number
   skipped: number
 }
@@ -97,6 +100,11 @@ export interface SyncJobStatus {
   /** Triggered but waiting behind the currently-running pass (passes are
    * serialized). Drives the "Queued" badge. */
   queued: boolean
+  /** Its last pass was cut short by Pause and can be resumed (re-run). */
+  paused: boolean
+  /** While running, a pause/stop requested but not yet in effect (it halts at the
+   * next checkpoint) — drives the "Pausing…" / "Stopping…" label. */
+  pending: 'pause' | 'stop' | null
   next_run_at: number | null
   last: PassSummary | null
 }
@@ -142,6 +150,9 @@ export interface SyncJob {
   interval: string
   max_adds: number
   max_removals: number
+  /** When true, removals over max_removals drain in capped batches across passes
+   * instead of being held back. Default false (held back for safety). */
+  apply_large_removals: boolean
   download: boolean
 }
 
@@ -182,6 +193,9 @@ export interface ProviderPlaylist {
   name: string
   count: number | null
   image: string
+  /** False for a followed (non-owned) playlist. Only Spotify distinguishes the
+   * two today; absent/true elsewhere. Drives the Created/Followed grouping. */
+  owned?: boolean
 }
 
 export type LinkDirection = 'oneway' | 'nway'

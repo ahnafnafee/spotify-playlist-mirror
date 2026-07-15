@@ -22,9 +22,9 @@ from ..engine.runner import run_pass
 from .syncs import SyncStore
 
 
-async def _run_pass_async(opts):
+async def _run_pass_async(opts, should_continue=None):
     """Run one blocking pass off the event loop (patched in tests)."""
-    return await asyncio.to_thread(run_pass, opts)
+    return await asyncio.to_thread(run_pass, opts, should_continue)
 
 
 class SyncService:
@@ -41,6 +41,8 @@ class SyncService:
         self._next_run = {}            # job_id -> epoch seconds of its next scheduled pass
         self._schedulers = {}          # job_id -> asyncio.Task
         self._lock = asyncio.Lock()    # one engine writer at a time (jobs + transfers)
+        self._control = "run"          # "run" | "pause" | "stop" for the in-flight pass
+        self._interrupted = {}         # job_id -> "paused" | "stopped" (last pass was cut short)
 
     # -- running ---------------------------------------------------------------
     def _opts_for(self, job, execute):
@@ -54,6 +56,7 @@ class SyncService:
         opts.playlists = job.playlists
         opts.max_adds = job.max_adds
         opts.max_removals = job.max_removals
+        opts.apply_large_removals = job.apply_large_removals
         # OMNI_DOWNLOAD_DIR (a container-internal bind-mount path set by
         # docker-compose) wins over the UI-saved DOWNLOAD_DIR: inside the
         # container that UI value can be a host path (e.g. a Windows F:\ path)
@@ -77,12 +80,19 @@ class SyncService:
         try:
             async with self._lock:
                 self._running_job, self._running_mode = job_id, ("execute" if execute else "preview")
+                self._control = "run"
+                self._interrupted.pop(job_id, None)
                 try:
                     self._emit("section", f"{job.name}: pass started ({'execute' if execute else 'dry run'})", "sync")
-                    summary = await _run_pass_async(self._opts_for(job, execute))
+                    summary = await _run_pass_async(self._opts_for(job, execute),
+                                                    should_continue=lambda: self._control)
                     summary.update(job_id=job_id, job_name=job.name)
                     self._last[job_id] = self._last_any = summary
-                    self._emit("summary", f"{job.name}: pass finished", "sync", summary)
+                    if summary.get("interrupted"):
+                        self._interrupted[job_id] = "paused" if summary["interrupted"] == "pause" else "stopped"
+                        self._emit("note", f"{job.name}: pass {self._interrupted[job_id]}", "sync")
+                    else:
+                        self._emit("summary", f"{job.name}: pass finished", "sync", summary)
                 except asyncio.CancelledError:
                     raise
                 except BaseException as e:  # a bad pass must never kill the scheduler
@@ -106,6 +116,30 @@ class SyncService:
         async with self._lock:
             return await asyncio.to_thread(fn)
 
+    def pause(self, job_id):
+        """Ask the running pass to halt at the next playlist boundary and hold as
+        resumable. False if that job isn't the one currently running."""
+        if self._running_job != job_id:
+            return False
+        self._control = "pause"
+        return True
+
+    def stop(self, job_id):
+        """Abort the running pass at the next playlist boundary — applied changes
+        stay. False if that job isn't currently running."""
+        if self._running_job != job_id:
+            return False
+        self._control = "stop"
+        return True
+
+    def resume(self, job_id):
+        """Re-run a paused job. reconcile is idempotent, so already-applied changes
+        are skipped and the pass picks up the remaining work. False if not paused."""
+        if self._interrupted.get(job_id) != "paused":
+            return False
+        asyncio.create_task(self.run_job(job_id, execute=True))
+        return True
+
     # -- scheduling ------------------------------------------------------------
     def _master_on(self):
         return self._settings.get("AUTO_SYNC", "on") != "off"
@@ -126,7 +160,9 @@ class SyncService:
             if jid not in self._schedulers:
                 self._schedulers[jid] = asyncio.create_task(self._job_scheduler(jid))
 
-    async def stop(self):
+    async def shutdown(self):
+        """Cancel every per-job scheduler — app teardown. (Not to be confused with
+        stop(job_id), which aborts a single in-flight pass.)"""
         self._stopping = True
         for jid in list(self._schedulers):
             self._schedulers.pop(jid).cancel()
@@ -172,6 +208,11 @@ class SyncService:
             # finish — passes are serialized (shared caches/archive/rate limits),
             # so a second "Sync now" queues rather than overlaps.
             "queued": job.id in self._active and self._running_job != job.id,
+            # Its last pass was cut short by Pause and can be resumed (re-run).
+            "paused": self._interrupted.get(job.id) == "paused",
+            # A pause/stop requested on the running job but not yet in effect (it
+            # halts at the next checkpoint) — drives the "Pausing…" indicator.
+            "pending": self._control if (self._running_job == job.id and self._control != "run") else None,
             "next_run_at": self._next_run.get(job.id),
             "last": self._last.get(job.id),
         }
