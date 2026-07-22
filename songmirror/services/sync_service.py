@@ -5,8 +5,10 @@ plus on-demand ("run now") passes. Exactly one pass runs at a time — a shared
 lock serializes jobs AND transfers, because the engine's on-disk resolve caches
 and shared SQLite are not safe under concurrent writers.
 
-Scheduling is per-job: each enabled job gets its own timer, all gated by a global
-master switch (AUTO_SYNC — the Dashboard toggle). The download mirror is global
+Scheduling is per-job: each enabled job fires on wall-clock boundaries (epoch
+multiples of its interval, e.g. 3h -> 00:00/03:00/06:00 UTC), so the cadence
+survives restarts instead of resetting to "interval after boot". All timers are
+gated by a global master switch (AUTO_SYNC — the Dashboard toggle). The download mirror is global
 (SettingsStore) and a job opts in via `job.download`. Passes run in a worker
 thread so the event loop stays responsive; lifecycle events reach the live view
 through the EventBus.
@@ -25,6 +27,12 @@ from .syncs import SyncStore
 async def _run_pass_async(opts, should_continue=None):
     """Run one blocking pass off the event loop (patched in tests)."""
     return await asyncio.to_thread(run_pass, opts, should_continue)
+
+
+def next_boundary_delay(now, interval):
+    """Seconds until the next wall-clock boundary (epoch multiple of interval).
+    Exactly on a boundary -> a full interval, so a pass can't double-fire."""
+    return interval - (now % interval)
 
 
 class SyncService:
@@ -175,8 +183,9 @@ class SyncService:
                 if job is None or not job.enabled:
                     break
                 interval = self._interval_s(job.interval)
-                self._next_run[job_id] = time.time() + interval
-                await asyncio.sleep(interval)
+                delay = next_boundary_delay(time.time(), interval)
+                self._next_run[job_id] = time.time() + delay
+                await asyncio.sleep(delay)
                 if not self._stopping:
                     await self.run_job(job_id, execute=True)
         except asyncio.CancelledError:
